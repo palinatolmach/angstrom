@@ -22,7 +22,7 @@ jobs:
       - name: Build
         run: cargo build 
   build-tests:
-    name: 'Build'
+    name: 'Build Tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -35,5 +35,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Build
+      - name: Build Tests
         run: cargo build --tests
