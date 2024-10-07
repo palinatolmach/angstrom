@@ -16,20 +16,16 @@ import {TickLib} from "src/libraries/TickLib.sol";
 import {TickReward, RewardLib} from "test/_helpers/RewardLib.sol";
 import {UsedIndexMap} from "super-sol/collections/UsedIndexMap.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
-import {ConversionLib} from "src/libraries/ConversionLib.sol";
+import {PoolId} from "v4-core/src/types/PoolId.sol";
+import {PairLib} from "test/_reference/Pair.sol";
 
 import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
 int24 constant TICK_SPACING = 60;
 
 /// @author philogy <https://github.com/philogy>
 contract PoolRewardsInvariantTest is BaseTest {
-    using FormatLib for *;
-
     using TickMath for int24;
-    using ConversionLib for *;
 
     UniV4Inspector public uniV4;
     ExtAngstrom public angstrom;
@@ -54,19 +50,23 @@ contract PoolRewardsInvariantTest is BaseTest {
         gate.tickSpacing(TICK_SPACING);
 
         int24 startTick = 0;
-        refId =
-            PoolIdLibrary.toId(address(0).toPoolKey(address(asset0), address(asset1), TICK_SPACING));
+        refId = poolKey(address(asset0), address(asset1), TICK_SPACING).toId();
         gate.setHook(address(0));
         gate.initializePool(address(asset0), address(asset1), startTick.getSqrtPriceAtTick(), 0);
 
         angstrom = ExtAngstrom(deployAngstrom(type(ExtAngstrom).creationCode, uniV4, controller));
-        id = PoolIdLibrary.toId(poolKey());
+        id = poolKey().toId();
 
         vm.prank(controller);
         angstrom.configurePool(asset0, asset1, uint16(uint24(TICK_SPACING)), 0);
 
         gate.setHook(address(angstrom));
-        gate.initializePool(address(asset0), address(asset1), startTick.getSqrtPriceAtTick(), 0);
+        angstrom.initializePool(
+            asset0,
+            asset1,
+            PairLib.getStoreIndex(rawGetConfigStore(address(angstrom)), asset0, asset1),
+            startTick.getSqrtPriceAtTick()
+        );
 
         handler =
             new PoolRewardsHandler(uniV4, angstrom, gate, id, refId, asset0, asset1, controller);
@@ -358,8 +358,6 @@ contract PoolRewardsInvariantTest is BaseTest {
     }
 
     function poolKey() internal view returns (PoolKey memory) {
-        return ConversionLib.toPoolKey(
-            address(angstrom), address(asset0), address(asset1), TICK_SPACING
-        );
+        return poolKey(angstrom, asset0, asset1, TICK_SPACING);
     }
 }

@@ -13,9 +13,8 @@ import {UniV4Inspector} from "test/_view-ext/UniV4Inspector.sol";
 import {ExtAngstrom} from "test/_view-ext/ExtAngstrom.sol";
 import {PoolGate} from "test/_helpers/PoolGate.sol";
 import {HookDeployer} from "test/_helpers/HookDeployer.sol";
-import {ConversionLib} from "src/libraries/ConversionLib.sol";
-import {PoolUpdateManager} from "src/modules/PoolUpdateManager.sol";
 import {Position} from "v4-core/src/libraries/Position.sol";
+import {PairLib} from "test/_reference/Pair.sol";
 
 import {TickReward, RewardLib} from "test/_helpers/RewardLib.sol";
 import {console} from "forge-std/console.sol";
@@ -23,7 +22,7 @@ import {console} from "forge-std/console.sol";
 int24 constant TICK_SPACING = 60;
 
 /// @author philogy <https://github.com/philogy>
-contract PoolUpdateManagerTest is HookDeployer, BaseTest {
+contract PoolUpdatesTest is HookDeployer, BaseTest {
     using TickMath for int24;
 
     UniV4Inspector public uniV4;
@@ -47,9 +46,7 @@ contract PoolUpdateManagerTest is HookDeployer, BaseTest {
         gate = new PoolGate(address(uniV4));
 
         int24 startTick = 0;
-        refId = PoolIdLibrary.toId(
-            ConversionLib.toPoolKey(address(0), address(asset0), address(asset1), TICK_SPACING)
-        );
+        refId = PoolIdLibrary.toId(poolKey(asset0, asset1, TICK_SPACING));
         gate.setHook(address(0));
         gate.initializePool(address(asset0), address(asset1), startTick.getSqrtPriceAtTick(), 0);
 
@@ -60,7 +57,12 @@ contract PoolUpdateManagerTest is HookDeployer, BaseTest {
         angstrom.configurePool(address(asset0), address(asset1), uint16(uint24(TICK_SPACING)), 0);
 
         gate.setHook(address(angstrom));
-        gate.initializePool(address(asset0), address(asset1), startTick.getSqrtPriceAtTick(), 0);
+        angstrom.initializePool(
+            asset0,
+            asset1,
+            PairLib.getStoreIndex(rawGetConfigStore(address(angstrom)), asset0, asset1),
+            startTick.getSqrtPriceAtTick()
+        );
 
         handler = new PoolRewardsHandler(uniV4, angstrom, gate, id, refId, asset0, asset1, gov);
     }
@@ -201,9 +203,7 @@ contract PoolUpdateManagerTest is HookDeployer, BaseTest {
     }
 
     function poolKey() internal view returns (PoolKey memory) {
-        return ConversionLib.toPoolKey(
-            address(angstrom), address(asset0), address(asset1), TICK_SPACING
-        );
+        return poolKey(angstrom, asset0, asset1, TICK_SPACING);
     }
 
     function re(TickReward memory reward) internal pure returns (TickReward[] memory r) {

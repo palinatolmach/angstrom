@@ -50,6 +50,7 @@ impl LiveState {
 }
 
 /// deltas to be applied to the base user action
+#[derive(Clone)]
 pub struct PendingUserAction {
     /// hash of order
     pub order_hash:     B256,
@@ -99,12 +100,12 @@ impl UserAccounts {
     }
 
     /// returns true if the order cancel has been processed successfully
-    pub fn cancel_order(&mut self, user: &UserAddress, order_hash: B256) -> bool {
+    pub fn cancel_order(&self, user: &UserAddress, order_hash: &B256) -> bool {
         let Some(mut inner_orders) = self.pending_actions.get_mut(user) else { return false };
         let mut res = false;
 
         inner_orders.retain(|o| {
-            let matches = o.order_hash != order_hash;
+            let matches = &o.order_hash != order_hash;
             res |= !matches;
             matches
         });
@@ -112,11 +113,11 @@ impl UserAccounts {
         res
     }
 
-    pub fn has_respend_conflict(
+    pub fn respend_conflicts(
         &self,
         user: UserAddress,
         avoidance: RespendAvoidanceMethod
-    ) -> bool {
+    ) -> Vec<PendingUserAction> {
         match avoidance {
             nonce @ RespendAvoidanceMethod::Nonce(_) => self
                 .pending_actions
@@ -124,10 +125,12 @@ impl UserAccounts {
                 .map(|v| {
                     v.value()
                         .iter()
-                        .any(|pending_order| pending_order.respend == nonce)
+                        .filter(|pending_order| pending_order.respend == nonce)
+                        .cloned()
+                        .collect()
                 })
                 .unwrap_or_default(),
-            RespendAvoidanceMethod::Block(_) => false
+            RespendAvoidanceMethod::Block(_) => Vec::new()
         }
     }
 

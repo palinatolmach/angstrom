@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Angstrom} from "src/Angstrom.sol";
+import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {Currency} from "v4-core/src/types/Currency.sol";
 import {Test} from "forge-std/Test.sol";
 import {Trader} from "./types/Trader.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {stdError} from "forge-std/StdError.sol";
-import {OrderMeta, TopOfBlockOrder} from "src/reference/OrderTypes.sol";
+import {OrderMeta, TopOfBlockOrder} from "test/_reference/OrderTypes.sol";
 import {TickLib} from "src/libraries/TickLib.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ANGSTROM_HOOK_FLAGS} from "src/Constants.sol";
 import {TypedDataHasherLib} from "src/types/TypedDataHasher.sol";
+import {PoolConfigStore, PoolConfigStoreLib} from "src/libraries/PoolConfigStore.sol";
+import {PairLib} from "test/_reference/Pair.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 
@@ -69,6 +76,27 @@ contract BaseTest is Test, HookDeployer {
         );
     }
 
+    function poolKey(Angstrom angstrom, address asset0, address asset1, int24 tickSpacing)
+        internal
+        pure
+        returns (PoolKey memory pk)
+    {
+        pk.hooks = IHooks(address(angstrom));
+        pk.currency0 = Currency.wrap(asset0);
+        pk.currency1 = Currency.wrap(asset1);
+        pk.tickSpacing = tickSpacing;
+    }
+
+    function poolKey(address asset0, address asset1, int24 tickSpacing)
+        internal
+        pure
+        returns (PoolKey memory pk)
+    {
+        pk.currency0 = Currency.wrap(asset0);
+        pk.currency1 = Currency.wrap(asset1);
+        pk.tickSpacing = tickSpacing;
+    }
+
     function computeDomainSeparator(address angstrom) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -81,6 +109,25 @@ contract BaseTest is Test, HookDeployer {
                 address(angstrom)
             )
         );
+    }
+
+    function pythonRunCmd() internal pure returns (string[] memory args) {
+        args = new string[](1);
+        args[0] = ".venv/bin/python3.12";
+    }
+
+    function ffiPython(string[] memory args) internal returns (bytes memory) {
+        string[] memory runArgs = pythonRunCmd();
+        string[] memory all = new string[](runArgs.length + args.length);
+        for (uint256 i = 0; i < runArgs.length; i++) {
+            all[i] = runArgs[i];
+        }
+
+        for (uint256 i = 0; i < args.length; i++) {
+            all[runArgs.length + i] = args[i];
+        }
+
+        return vm.ffi(all);
     }
 
     function i24(uint256 x) internal pure returns (int24 y) {
@@ -250,5 +297,19 @@ contract BaseTest is Test, HookDeployer {
 
     function max(uint256 x, uint256 y) internal pure returns (uint256) {
         return x > y ? x : y;
+    }
+
+    function poolId(Angstrom angstrom, address asset0, address asset1)
+        internal
+        view
+        returns (PoolId)
+    {
+        if (asset0 > asset1) (asset0, asset1) = (asset1, asset0);
+        address store = rawGetConfigStore(address(angstrom));
+        uint256 storeIndex = PairLib.getStoreIndex(store, asset0, asset1);
+        (int24 tickSpacing,) = PoolConfigStore.wrap(store).get(
+            PoolConfigStoreLib.keyFromAssetsUnchecked(asset0, asset1), storeIndex
+        );
+        return poolKey(angstrom, asset0, asset1, tickSpacing).toId();
     }
 }

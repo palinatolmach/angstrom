@@ -1,74 +1,59 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import {ERC712} from "./modules/ERC712.sol";
-import {NodeManager} from "./modules/NodeManager.sol";
-import {SettlementManager} from "./modules/SettlementManager.sol";
-import {PoolUpdateManager} from "./modules/PoolUpdateManager.sol";
-import {InvalidationManager} from "./modules/InvalidationManager.sol";
-import {HookManager} from "./modules/HookManager.sol";
+import {EIP712} from "solady/src/utils/EIP712.sol";
+import {TopLevelAuth} from "./modules/TopLevelAuth.sol";
+import {Settlement} from "./modules/Settlement.sol";
+import {PoolUpdates} from "./modules/PoolUpdates.sol";
+import {OrderInvalidation} from "./modules/OrderInvalidation.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {UniConsumer} from "./modules/UniConsumer.sol";
-import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {PermitSubmitterHook} from "./modules/PermitSubmitterHook.sol";
+import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.sol";
 
-import {TypedDataHasher} from "./types/TypedDataHasher.sol";
-
-import {AssetArray, AssetLib} from "./types/Asset.sol";
-import {PairArray, Pair, PairLib} from "./types/Pair.sol";
-import {ToBOrderBuffer} from "./types/ToBOrderBuffer.sol";
-import {UserOrderBuffer} from "./types/UserOrderBuffer.sol";
-import {UserOrderVariantMap} from "./types/UserOrderVariantMap.sol";
-import {ToBOrderVariantMap} from "./types/ToBOrderVariantMap.sol";
-import {HookBuffer, HookBufferLib} from "./types/HookBuffer.sol";
 import {CalldataReader, CalldataReaderLib} from "./types/CalldataReader.sol";
+import {AssetArray, AssetLib} from "./types/Asset.sol";
+import {PairArray, PairLib} from "./types/Pair.sol";
+import {TypedDataHasher, TypedDataHasherLib} from "./types/TypedDataHasher.sol";
+import {HookBuffer, HookBufferLib} from "./types/HookBuffer.sol";
 import {SignatureLib} from "./libraries/SignatureLib.sol";
 import {
     PriceAB as PriceOutVsIn, AmountA as AmountOut, AmountB as AmountIn
 } from "./types/Price.sol";
-import {PoolConfigStore} from "./libraries/pool-config/PoolConfigStore.sol";
-
-import {RayMathLib} from "./libraries/RayMathLib.sol";
-
-// TODO: Remove
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
+import {ToBOrderBuffer} from "./types/ToBOrderBuffer.sol";
+import {ToBOrderVariantMap} from "./types/ToBOrderVariantMap.sol";
+import {UserOrderBuffer} from "./types/UserOrderBuffer.sol";
+import {UserOrderVariantMap} from "./types/UserOrderVariantMap.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract Angstrom is
-    ERC712,
-    InvalidationManager,
-    SettlementManager,
-    NodeManager,
-    HookManager,
-    PoolUpdateManager,
+    EIP712,
+    OrderInvalidation,
+    Settlement,
+    TopLevelAuth,
+    PoolUpdates,
     IUnlockCallback,
     PermitSubmitterHook
 {
-    using RayMathLib for uint256;
-    // TODO: Remove
-    using FormatLib for *;
-
     error LimitViolated();
     error ToBGasUsedAboveMax();
 
     constructor(IPoolManager uniV4, address controller, address feeMaster)
         UniConsumer(uniV4)
-        NodeManager(controller)
-        SettlementManager(feeMaster)
-    {}
+        TopLevelAuth(controller)
+        Settlement(feeMaster)
+    {
+        _checkAngstromHookFlags();
+    }
 
     function execute(bytes calldata encoded) external {
         _nodeBundleLock();
         UNI_V4.unlock(encoded);
     }
 
-    function unlockCallback(bytes calldata data)
-        external
-        override
-        onlyUniV4
-        returns (bytes memory)
-    {
+    function unlockCallback(bytes calldata data) external override returns (bytes memory) {
+        _onlyUniV4();
+
         CalldataReader reader = CalldataReaderLib.from(data);
 
         AssetArray assets;
@@ -77,17 +62,16 @@ contract Angstrom is
         (reader, pairs) = PairLib.readFromAndValidate(reader, assets, _configStore);
 
         _takeAssets(assets);
-        reader = _updatePools(reader, bundleDeltas, pairs);
+        reader = _updatePools(reader, pairs);
         reader = _validateAndExecuteToBOrders(reader, pairs);
         reader = _validateAndExecuteUserOrders(reader, pairs);
         reader.requireAtEndOf(data);
-
         _saveAndSettle(assets);
 
         // Return empty bytes.
         assembly ("memory-safe") {
-            mstore(0x00, 0x20)
-            mstore(0x20, 0x00)
+            mstore(0x00, 0x20) // Dynamic type relative offset
+            mstore(0x20, 0x00) // Bytes length
             return(0x00, 0x40)
         }
     }
@@ -108,8 +92,7 @@ contract Angstrom is
 
         TypedDataHasher typedHasher = _erc712Hasher();
         ToBOrderBuffer memory buffer;
-        // No ERC712 variants for ToB orders so typehash can remain unchanged.
-        buffer.setTypeHash();
+        buffer.init();
 
         // Purposefully devolve into an endless loop if the specified length isn't exactly used s.t.
         // `reader == end` at some point.
@@ -138,10 +121,15 @@ contract Angstrom is
         (reader, buffer.quantityIn) = reader.readU128();
         (reader, buffer.quantityOut) = reader.readU128();
         (reader, buffer.maxGasAsset0) = reader.readU128();
-        uint128 gasUsedAsset0;
         {
+            uint128 gasUsedAsset0;
             (reader, gasUsedAsset0) = reader.readU128();
             if (gasUsedAsset0 > buffer.maxGasAsset0) revert ToBGasUsedAboveMax();
+            if (variantMap.zeroForOne()) {
+                buffer.quantityIn += gasUsedAsset0;
+            } else {
+                buffer.quantityOut -= gasUsedAsset0;
+            }
         }
 
         {
@@ -154,7 +142,6 @@ contract Angstrom is
         (reader, buffer.recipient) =
             variantMap.recipientIsSome() ? reader.readAddr() : (reader, address(0));
 
-        // The `.hash` method validates the `block.number` for flash orders.
         bytes32 orderHash = typedHasher.hashTypedData(buffer.hash());
 
         _invalidateOrderHash(orderHash);
@@ -164,28 +151,17 @@ contract Angstrom is
             ? SignatureLib.readAndCheckEcdsa(reader, orderHash)
             : SignatureLib.readAndCheckERC1271(reader, orderHash);
 
-        address to = _defaultOr(buffer.recipient, from);
-        if (variantMap.zeroForOne()) {
-            _settleOrderIn(
-                from,
-                buffer.assetIn,
-                AmountIn.wrap(buffer.quantityIn - gasUsedAsset0),
-                variantMap.useInternal()
-            );
-            _settleOrderOut(
-                to, buffer.assetOut, AmountOut.wrap(buffer.quantityOut), variantMap.useInternal()
-            );
-        } else {
-            _settleOrderIn(
-                from, buffer.assetIn, AmountIn.wrap(buffer.quantityIn), variantMap.useInternal()
-            );
-            _settleOrderOut(
-                to,
-                buffer.assetOut,
-                AmountOut.wrap(buffer.quantityOut - gasUsedAsset0),
-                variantMap.useInternal()
-            );
+        address to = buffer.recipient;
+        assembly {
+            to := or(mul(iszero(to), from), to)
         }
+        _settleOrderIn(
+            from, buffer.assetIn, AmountIn.wrap(buffer.quantityIn), variantMap.useInternal()
+        );
+        _settleOrderOut(
+            to, buffer.assetOut, AmountOut.wrap(buffer.quantityOut), variantMap.useInternal()
+        );
+
         return reader;
     }
 
@@ -215,14 +191,8 @@ contract Angstrom is
         PairArray pairs
     ) internal returns (CalldataReader) {
         UserOrderVariantMap variantMap;
-        {
-            uint8 variantByte;
-            (reader, variantByte) = reader.readU8();
-            variantMap = UserOrderVariantMap.wrap(variantByte);
-        }
-
-        buffer.setTypeHash(variantMap);
-        buffer.useInternal = variantMap.useInternal();
+        // Load variant map, ref id and set use internal.
+        (reader, variantMap) = buffer.init(reader);
 
         // Load and lookup asset in/out and dependent values.
         PriceOutVsIn price;
@@ -252,7 +222,7 @@ contract Angstrom is
         AmountOut amountOut;
         (reader, amountIn, amountOut) = buffer.loadAndComputeQuantity(reader, variantMap, price);
 
-        bytes32 orderHash = buffer.hash712(variantMap, typedHasher);
+        bytes32 orderHash = typedHasher.hashTypedData(buffer.structHash(variantMap));
 
         address from;
         (reader, from) = variantMap.isEcdsa()
@@ -269,15 +239,25 @@ contract Angstrom is
         hook.tryTrigger(from);
 
         _settleOrderIn(from, buffer.assetIn, amountIn, variantMap.useInternal());
-        address to = _defaultOr(buffer.recipient, from);
+        address to = buffer.recipient;
+        assembly {
+            to := or(mul(iszero(to), from), to)
+        }
         _settleOrderOut(to, buffer.assetOut, amountOut, variantMap.useInternal());
 
         return reader;
     }
 
-    function _defaultOr(address defaultAddr, address alt) internal pure returns (address addr) {
-        assembly {
-            addr := xor(shr(defaultAddr, alt), defaultAddr)
-        }
+    function _domainNameAndVersion()
+        internal
+        pure
+        override
+        returns (string memory, string memory)
+    {
+        return ("Angstrom", "v1");
+    }
+
+    function _erc712Hasher() internal view returns (TypedDataHasher) {
+        return TypedDataHasherLib.init(_domainSeparator());
     }
 }

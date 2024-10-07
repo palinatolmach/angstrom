@@ -3,29 +3,14 @@ pragma solidity ^0.8.0;
 
 import {UniConsumer} from "./UniConsumer.sol";
 
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {DeltaTracker} from "../types/DeltaTracker.sol";
-import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {AssetArray, Asset, FEE_SUMMARY_ENTRY_SIZE} from "../types/Asset.sol";
-import {
-    PriceAB as PriceOutVsIn, AmountA as AmountOut, AmountB as AmountIn
-} from "../types/Price.sol";
-import {CalldataReader} from "../types/CalldataReader.sol";
-import {IUniV4} from "../interfaces/IUniV4.sol";
-import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
-import {Currency} from "v4-core/src/types/Currency.sol";
-
+import {AmountA as AmountOut, AmountB as AmountIn} from "../types/Price.sol";
 import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
-import {ConversionLib} from "src/libraries/ConversionLib.sol";
-
-import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
-abstract contract SettlementManager is UniConsumer {
-    using IUniV4 for IPoolManager;
+abstract contract Settlement is UniConsumer {
     using SafeTransferLib for address;
-    using ConversionLib for address;
 
     error BundleChangeNetNegative(address asset);
     error NotFeeMaster();
@@ -76,13 +61,16 @@ abstract contract SettlementManager is UniConsumer {
     function _takeAssets(AssetArray assets) internal {
         uint256 length = assets.len();
         for (uint256 i = 0; i < length; i++) {
-            Asset asset = assets.getUnchecked(i);
-            uint256 amount = asset.take();
-            if (amount > 0) {
-                address addr = asset.addr();
-                UNI_V4.take(addr.intoC(), address(this), amount);
-                bundleDeltas.add(addr, amount);
-            }
+            _take(assets.getUnchecked(i));
+        }
+    }
+
+    function _take(Asset asset) internal {
+        uint256 amount = asset.take();
+        if (amount > 0) {
+            address addr = asset.addr();
+            UNI_V4.take(_c(addr), address(this), amount);
+            bundleDeltas.add(addr, amount);
         }
     }
 
@@ -108,7 +96,7 @@ abstract contract SettlementManager is UniConsumer {
             }
 
             if (settle > 0) {
-                UNI_V4.sync(addr.intoC());
+                UNI_V4.sync(_c(addr));
                 addr.safeTransfer(address(UNI_V4), settle);
                 UNI_V4.settle();
             }
@@ -124,15 +112,6 @@ abstract contract SettlementManager is UniConsumer {
             mstore(0x00, keccak256(raw_feeSummaryStartPtr, mul(length, FEE_SUMMARY_ENTRY_SIZE)))
             log0(0x00, 0x20)
         }
-    }
-
-    /// @dev Sends rewards by crediting them delta in the pool manager. WARN: expects invoker to
-    /// validate accounting for `amount`.
-    function _settleRewardViaUniswapTo(address to, Currency asset, uint256 amount) internal {
-        if (amount == 0) return;
-        UNI_V4.sync(asset);
-        Currency.unwrap(asset).safeTransfer(address(UNI_V4), amount);
-        UNI_V4.settleFor(to);
     }
 
     function _settleOrderIn(address from, address asset, AmountIn amountIn, bool useInternal)

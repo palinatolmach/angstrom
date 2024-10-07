@@ -1,6 +1,6 @@
 # Angstrom Payload Struct Specification
 
-**Corresponding Source file:** [`Angstrom.sol`](../../contracts/src/Angstrom.sol)
+**Corresponding Source file:** [`Angstrom.sol`](../src/Angstrom.sol)
 
 ## Overview
 
@@ -58,7 +58,7 @@ signature validation process.
 
 ### Bundle contents
 
-The bundle is a struct encoded using the [PADE format](./Encoding.md). The string of bytes is the
+The bundle is a struct encoded using the [PADE format](./pade-encoding-format.md). The string of bytes is the
 value that the `execute` method is called with (not that the call itself is still ABI encoded, just
 the contents of the single `bytes` parameter itself is PADE).
 
@@ -83,8 +83,8 @@ struct Bundle {
 
 #### `Asset`
 
-Solidity: [decoding implementation](../../contracts/src/types/Asset.sol) | [reference
-encoding (`src/reference/Asset.sol`)](../../contracts/src/reference/Asset.sol)
+Solidity: [decoding implementation](../src/types/Asset.sol) | [reference
+encoding (`test/_reference/Asset.sol`)](../test/_reference/Asset.sol)
 
 ```rust
 struct Asset {
@@ -107,8 +107,8 @@ The elements **must be** sorted in ascending order according the value of `.addr
 
 #### `Pair`
 
-Solidity: [decoding implementation](../../contracts/src/types/Pair.sol) | [reference
-encoding (`src/reference/Pair.sol`)](../../contracts/src/reference/Pair.sol)
+Solidity: [decoding implementation](../src/types/Pair.sol) | [reference
+encoding (`test/_reference/Pair.sol`)](../test/_reference/Pair.sol)
 
 ```rust
 struct Pair {
@@ -137,8 +137,8 @@ Note that to ensure pair uniqueness `.index0` **must** be less than `.index1`.
 
 TODO: Update solidity link
 
-Solidity: [decoding implementation](../../contracts/src/types/PoolSwap.sol) | [reference
-encoding (`src/reference/PoolSwap.sol`)](../../contracts/src/reference/PoolSwap.sol)
+Solidity: [decoding implementation](../src/types/PoolUpdates.sol) | [reference
+encoding (`test/_reference/PoolUpdate.sol`)](../test/_reference/PoolUpdate.sol)
 
 
 ```rust
@@ -164,7 +164,7 @@ recommended to net out multiple swaps against the same pool into one to save on 
 
 ##### Rewards Update
 
-Solidity: [decoding implementation (`_decodeAndReward`)](../../contracts/src/modules/RewardsUpdater.sol) | [reference encoding](../../contracts/src/reference/PoolRewardsUpdate.sol).
+Solidity: [decoding implementation (`_decodeAndReward`)](../src/modules/GrowthOutsideUpdater.sol) | [reference encoding](../test/_reference/PoolUpdate.sol).
 
 ```rust
 enum RewardsUpdate {
@@ -251,7 +251,7 @@ def update_rewards(
 
 #### `TopOfBlockOrder`
 
-Solidity: [decoding implementation (`_validateAndExecuteToB`)](../../contracts/src/Angstrom.sol) | [reference encoding](../../contracts/src/reference/OrderTypes.sol).
+Solidity: [decoding implementation (`_validateAndExecuteToB`)](../src/Angstrom.sol) | [reference encoding](../test/_reference/OrderTypes.sol).
 
 ```rust
 struct TopOfBlockOrder {
@@ -283,6 +283,7 @@ struct TopOfBlockOrder {
 
 ```rust
 struct UserOrder {
+    ref_id: u32,
     use_internal: bool,
     pair_index: u16,
     min_price: u256,
@@ -291,8 +292,8 @@ struct UserOrder {
     zero_for_one: bool,
     standing_validation: Option<StandingValidation>,
     order_quantities: OrderQuantities,
-    max_gas_asset0: u128,
-    gas_used_asset0: u128,
+    max_extra_fee_asset0: u128,
+    extra_fee_asset0: u128,
     exact_in: bool,
     signature: Signature
 }
@@ -318,6 +319,7 @@ enum OrderQuantities {
 
 |Field|Description|
 |-----|-----------|
+|`ref_id: uint32`|Opt-in tag for source of order flow. May opt the user into being charged extra fees beyond gas.|
 |`use_internal: bool`|Whether to use angstrom internal balance (`true`) or actual ERC20 balance (`false`) to settle|
 |`pair_index: u16`|The index into the `List<Pair>` array that the order is trading in.|
 |`min_price: u256`|The minimum price in asset out over asset in base units in RAY|
@@ -326,8 +328,8 @@ enum OrderQuantities {
 |`zero_for_one: bool`|Whether the order is swapping in the pair's `asset0` and getting out `asset1` (`true`) or the other way around (`false`)|
 |`standing_validation: Option<StandingValidation>`|The one-time order validation data. (`None` implies a flash order which is validated via the block number)|
 |`order_quantities: OrderQuantities`|Description of the quantities the order trades.|
-|`max_gas_asset0: u128`|The maximum gas the user accepts to be charged (in asset0 base units)|
-|`gas_used_asset0: u128`|The actual gas the user ended up getting charged for their order (in asset0 base units)|
+|`max_extra_fee_asset0: u128`|The maximum gas + referral fee the user accepts to be charged (in asset0 base units)|
+|`extra_fee_asset0: u128`|The actual extra fee the user ended up getting charged for their order (in asset0 base units)|
 |`exact_in: bool`|For exact orders: whether the specified quantity is the input or output (disregarded for partial orders).|
 |`signature: Signature`|The signature validating the order.|
 

@@ -5,7 +5,6 @@ use angstrom_types::{
     orders::OrderId,
     sol_bindings::{ext::RawPoolOrder, grouped_orders::OrderWithStorageData}
 };
-use dashmap::DashSet;
 use thiserror::Error;
 use user::UserAccounts;
 
@@ -18,18 +17,16 @@ pub mod user;
 /// wether or not this order is valid.
 pub struct UserAccountProcessor<S> {
     /// keeps track of all user accounts
-    user_accounts:         UserAccounts,
+    user_accounts: UserAccounts,
     /// utils for fetching the required data to verify
     /// a order.
-    fetch_utils:           S,
-    /// to ensure that we don't re-validate a canceled order
-    known_canceled_orders: DashSet<B256>
+    fetch_utils:   S
 }
 
 impl<S: StateFetchUtils> UserAccountProcessor<S> {
     pub fn new(current_block: u64, fetch_utils: S) -> Self {
         let user_accounts = UserAccounts::new(current_block);
-        Self { fetch_utils, user_accounts, known_canceled_orders: DashSet::default() }
+        Self { fetch_utils, user_accounts }
     }
 
     /// Fetches the state overrides that are required for the hook simulation.
@@ -43,10 +40,6 @@ impl<S: StateFetchUtils> UserAccountProcessor<S> {
     }
 
     pub fn prepare_for_new_block(&self, users: Vec<Address>, orders: Vec<B256>) {
-        orders.iter().for_each(|order| {
-            self.known_canceled_orders.remove(order);
-        });
-
         self.user_accounts.new_block(users, orders);
     }
 
@@ -77,14 +70,17 @@ impl<S: StateFetchUtils> UserAccountProcessor<S> {
         }
 
         // very we don't have a respend conflict
-        if self.user_accounts.has_respend_conflict(user, respend) {
+        let conflicting_orders = self.user_accounts.respend_conflicts(user, respend);
+        if conflicting_orders
+            .iter()
+            .any(|o| o.order_hash <= order_hash)
+        {
             return Err(UserAccountVerificationError::DuplicateNonce(order_hash))
         }
-
-        // see if order has been cancelled before
-        if self.known_canceled_orders.contains(&order_hash) {
-            return Err(UserAccountVerificationError::OrderIsCancelled(order_hash))
-        }
+        // if new order has lower hash cancel all orders with the same nonce
+        conflicting_orders.iter().for_each(|order| {
+            self.user_accounts.cancel_order(&user, &order.order_hash);
+        });
 
         let live_state = self.user_accounts.get_live_state_for_order(
             user,
@@ -94,7 +90,7 @@ impl<S: StateFetchUtils> UserAccountProcessor<S> {
         );
 
         // ensure that the current live state is enough to satisfy the order
-        let (is_cur_valid, invalid_orders) = live_state
+        let (is_cur_valid, mut invalid_orders) = live_state
             .can_support_order(&order, &pool_info)
             .map(|pending_user_action| {
                 (
@@ -104,6 +100,9 @@ impl<S: StateFetchUtils> UserAccountProcessor<S> {
                 )
             })
             .unwrap_or_default();
+
+        // invalidate orders with clashing nonces
+        invalid_orders.extend(conflicting_orders.into_iter().map(|o| o.order_hash));
 
         Ok(order.into_order_storage_with_data(
             block,
@@ -167,7 +166,6 @@ pub mod tests {
         primitive::PoolId,
         sol_bindings::{grouped_orders::GroupedVanillaOrder, RawPoolOrder}
     };
-    use dashmap::DashSet;
     use rand::thread_rng;
     use reth_primitives::Address;
     use revm::primitives::bitvec::store::BitStore;
@@ -181,9 +179,8 @@ pub mod tests {
 
     fn setup_test_account_processor(block: u64) -> UserAccountProcessor<MockFetch> {
         UserAccountProcessor {
-            user_accounts:         UserAccounts::new(block),
-            fetch_utils:           MockFetch::default(),
-            known_canceled_orders: DashSet::default()
+            user_accounts: UserAccounts::new(block),
+            fetch_utils:   MockFetch::default()
         }
     }
 

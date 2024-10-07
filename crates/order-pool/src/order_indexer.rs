@@ -337,7 +337,6 @@ impl<V: OrderValidatorHandle<Order = AllOrders>> OrderIndexer<V> {
             .iter()
             .filter_map(|tx_hash| self.order_hash_to_order_id.get(tx_hash))
             .collect::<Vec<_>>();
-
         self.order_storage.park_orders(order_info);
     }
 

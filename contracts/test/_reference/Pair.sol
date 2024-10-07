@@ -3,16 +3,16 @@ pragma solidity ^0.8.0;
 
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 import {Asset, AssetLib} from "./Asset.sol";
-import {RayMathLib} from "../libraries/RayMathLib.sol";
-import {PairLib as ActualPairLib} from "../types/Pair.sol";
-import {PriceAB} from "../types/Price.sol";
+import {RayMathLib} from "src/libraries/RayMathLib.sol";
+import {PairLib as ActualPairLib} from "src/types/Pair.sol";
+import {PriceAB} from "src/types/Price.sol";
 import {
     PoolConfigStore,
     PoolConfigStoreLib,
     StoreKey,
     STORE_HEADER_SIZE
-} from "src/libraries/pool-config/PoolConfigStore.sol";
-import {ConfigEntry, ENTRY_SIZE} from "src/libraries/pool-config/ConfigEntry.sol";
+} from "src/libraries/PoolConfigStore.sol";
+import {ConfigEntry, ENTRY_SIZE} from "src/types/ConfigEntry.sol";
 
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 import {console} from "forge-std/console.sol";

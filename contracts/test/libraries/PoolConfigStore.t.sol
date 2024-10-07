@@ -3,15 +3,15 @@ pragma solidity ^0.8.0;
 
 import {BaseTest} from "test/_helpers/BaseTest.sol";
 import {ExtAngstrom} from "test/_view-ext/ExtAngstrom.sol";
-import {NodeManager} from "src/modules/NodeManager.sol";
+import {TopLevelAuth} from "src/modules/TopLevelAuth.sol";
 import {
     PoolConfigStore,
     MAX_FEE,
     STORE_HEADER_SIZE,
     PoolConfigStoreLib,
     StoreKey
-} from "src/libraries/pool-config/PoolConfigStore.sol";
-import {ENTRY_SIZE} from "src/libraries/pool-config/ConfigEntry.sol";
+} from "src/libraries/PoolConfigStore.sol";
+import {ENTRY_SIZE} from "src/types/ConfigEntry.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {console} from "forge-std/console.sol";
 
@@ -88,6 +88,67 @@ contract PoolConfigStoreTest is BaseTest {
         assertEq(feeInE6, 0.1003e6);
     }
 
+    function test_fuzzing_removeExistingWhenGreaterThanOne(uint256 indexToRemove) public {
+        indexToRemove = bound(indexToRemove, 0, 2);
+
+        vm.startPrank(controller);
+        angstrom.configurePool(assets[0], assets[1], 19, 0.01e6);
+        angstrom.configurePool(assets[3], assets[31], 120, 0.000134e6);
+        angstrom.configurePool(assets[4], assets[7], 41, 0.1003e6);
+        vm.stopPrank();
+
+        PoolConfigStore store = angstrom.configStore();
+        vm.prank(controller);
+        angstrom.removePool(PoolConfigStore.unwrap(store), indexToRemove);
+        PoolConfigStore storeAfter = angstrom.configStore();
+        assertTrue(PoolConfigStore.unwrap(store) != PoolConfigStore.unwrap(storeAfter));
+        assertEq(storeAfter.totalEntries(), 2);
+        if (indexToRemove == 0) {
+            (int24 tickSpacing, uint24 feeInE6) = storeAfter.get(skey(assets[3], assets[31]), 0);
+            assertEq(tickSpacing, 120);
+            assertEq(feeInE6, 0.000134e6);
+            (tickSpacing, feeInE6) = storeAfter.get(skey(assets[4], assets[7]), 1);
+            assertEq(tickSpacing, 41);
+            assertEq(feeInE6, 0.1003e6);
+        } else if (indexToRemove == 1) {
+            (int24 tickSpacing, uint24 feeInE6) = storeAfter.get(skey(assets[0], assets[1]), 0);
+            assertEq(tickSpacing, 19);
+            assertEq(feeInE6, 0.01e6);
+            (tickSpacing, feeInE6) = storeAfter.get(skey(assets[4], assets[7]), 1);
+            assertEq(tickSpacing, 41);
+            assertEq(feeInE6, 0.1003e6);
+        } else if (indexToRemove == 2) {
+            (int24 tickSpacing, uint24 feeInE6) = storeAfter.get(skey(assets[0], assets[1]), 0);
+            assertEq(tickSpacing, 19);
+            assertEq(feeInE6, 0.01e6);
+            (tickSpacing, feeInE6) = storeAfter.get(skey(assets[3], assets[31]), 1);
+            assertEq(tickSpacing, 120);
+            assertEq(feeInE6, 0.000134e6);
+        }
+    }
+
+    function test_fuzzing_removeStandalone(
+        address asset0,
+        address asset1,
+        uint16 tickSpacing,
+        uint24 feeInE6
+    ) public {
+        vm.assume(asset0 != asset1);
+        tickSpacing = uint16(bound(tickSpacing, 1, type(uint16).max));
+        feeInE6 = uint24(bound(feeInE6, 0, MAX_FEE));
+
+        vm.prank(controller);
+        angstrom.configurePool(asset0, asset1, tickSpacing, feeInE6);
+        PoolConfigStore store = angstrom.configStore();
+
+        vm.prank(controller);
+        angstrom.removePool(PoolConfigStore.unwrap(store), 0);
+
+        PoolConfigStore newStore = angstrom.configStore();
+        assertEq(newStore.totalEntries(), 0);
+        assertEq(PoolConfigStore.unwrap(newStore), address(0));
+    }
+
     function test_configure_existing() public {
         vm.prank(controller);
         angstrom.configurePool(assets[0], assets[1], 190, 0);
@@ -108,24 +169,6 @@ contract PoolConfigStoreTest is BaseTest {
         assertEq(feeInE6, 0.199e6);
     }
 
-    // function test_prevents_configuringTooManyPools() public {
-    //     uint256 maxPools = (0x6000 - STORE_HEADER_SIZE) / ENTRY_SIZE;
-    //     vm.startPrank(controller);
-    //     vm.pauseGasMetering();
-    //     for (uint256 i = 1; i <= maxPools; i++) {
-    //         angstrom.configurePool(address(uint160(i)), address(uint160(i + 1)), 1, 0);
-    //     }
-    //     vm.resumeGasMetering();
-
-    //     PoolConfigStore store = angstrom.configStore();
-    //     assertEq(store.totalEntries(), maxPools);
-
-    //     vm.expectRevert(PoolConfigStoreLib.FailedToDeployNewStore.selector);
-    //     angstrom.configurePool(address(1000), address(2000), 1, 0);
-
-    //     vm.stopPrank();
-    // }
-
     function test_fuzzing_prevents_nonControllerConfiguring(
         address configurer,
         address asset0,
@@ -138,7 +181,7 @@ contract PoolConfigStoreTest is BaseTest {
         tickSpacing = uint16(bound(tickSpacing, 1, type(uint16).max));
         feeInE6 = uint24(bound(feeInE6, 0, MAX_FEE));
         vm.prank(configurer);
-        vm.expectRevert(NodeManager.NotController.selector);
+        vm.expectRevert(TopLevelAuth.NotController.selector);
         if (asset0 > asset1) (asset0, asset1) = (asset1, asset0);
         angstrom.configurePool(asset0, asset1, tickSpacing, feeInE6);
     }

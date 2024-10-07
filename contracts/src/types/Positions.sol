@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {PoolId} from "v4-core/src/types/PoolId.sol";
-import {POSITIONS_STORAGE_PREFIX} from "src/Constants.sol";
 
 struct Positions {
     mapping(PoolId id => mapping(bytes32 uniPositionKey => Position)) positions;
@@ -19,7 +18,7 @@ library PositionsLib {
     function get(
         Positions storage self,
         PoolId id,
-        address sender,
+        address owner,
         int24 lowerTick,
         int24 upperTick,
         bytes32 salt
@@ -27,11 +26,11 @@ library PositionsLib {
         assembly ("memory-safe") {
             let free := mload(0x40)
 
-            // Compute `positionKey` as `keccak256(abi.encodePacked(sender, lowerTick, upperTick, sender))`.
-            // Less efficient than alternative ordering *but* lets us have the position key.
+            // Compute `positionKey` as `keccak256(abi.encodePacked(owner, lowerTick, upperTick, salt))`.
+            // Less efficient than alternative ordering *but* lets us reuse as Uniswap position key.
             mstore(0x06, upperTick)
             mstore(0x03, lowerTick)
-            mstore(0x00, sender)
+            mstore(0x00, owner)
             // WARN: Free memory pointer temporarily invalid from here on.
             mstore(0x26, salt)
             positionKey := keccak256(12, add(add(3, 3), add(20, 32)))

@@ -14,15 +14,14 @@ import {UsedIndexMap} from "super-sol/collections/UsedIndexMap.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
-import {ConversionLib} from "src/libraries/ConversionLib.sol";
-import {PoolConfigStore} from "src/libraries/pool-config/PoolConfigStore.sol";
+import {PoolConfigStore} from "src/libraries/PoolConfigStore.sol";
 
 import {LibSort} from "solady/src/utils/LibSort.sol";
 
-import {Bundle, Pair} from "src/reference/Bundle.sol";
-import {Asset} from "src/reference/Asset.sol";
-import {PoolUpdate, RewardsUpdate} from "src/reference/PoolUpdate.sol";
-import {TopOfBlockOrder} from "src/reference/OrderTypes.sol";
+import {Bundle, Pair} from "test/_reference/Bundle.sol";
+import {Asset} from "test/_reference/Asset.sol";
+import {PoolUpdate, RewardsUpdate} from "test/_reference/PoolUpdate.sol";
+import {TopOfBlockOrder} from "test/_reference/OrderTypes.sol";
 
 import {EnumerableSetLib} from "solady/src/utils/EnumerableSetLib.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -34,7 +33,6 @@ int24 constant TICK_SPACING = 60;
 contract PoolRewardsHandler is BaseTest {
     using FormatLib for *;
     using EnumerableSetLib for EnumerableSetLib.Int256Set;
-    using ConversionLib for *;
     using TickLib for int24;
 
     using RewardLib for TickReward[];

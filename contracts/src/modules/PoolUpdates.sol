@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {RewardsUpdater} from "./RewardsUpdater.sol";
+import {GrowthOutsideUpdater} from "./GrowthOutsideUpdater.sol";
 import {UniConsumer} from "./UniConsumer.sol";
-import {SettlementManager} from "./SettlementManager.sol";
-import {NodeManager} from "./NodeManager.sol";
+import {Settlement} from "./Settlement.sol";
+import {TopLevelAuth} from "./TopLevelAuth.sol";
 import {IBeforeAddLiquidityHook, IBeforeRemoveLiquidityHook} from "../interfaces/IHooks.sol";
 
 import {DeltaTracker} from "../types/DeltaTracker.sol";
 import {PairArray} from "../types/Pair.sol";
 import {CalldataReader} from "../types/CalldataReader.sol";
 import {PoolRewards} from "../types/PoolRewards.sol";
-import {Positions, Position} from "src/libraries/Positions.sol";
-import {UniCallLib, UniSwapCallBuffer} from "src/libraries/UniCallLib.sol";
-import {PoolUpdateVariantMap} from "src/types/PoolUpdateVariantMap.sol";
+import {Positions, Position} from "../types/Positions.sol";
+import {SwapCall, SwapCallLib} from "../types/SwapCall.sol";
+import {PoolUpdateVariantMap} from "../types/PoolUpdateVariantMap.sol";
 
-import {ConversionLib} from "src/libraries/ConversionLib.sol";
 import {SignedUnsignedLib} from "super-sol/libraries/SignedUnsignedLib.sol";
+import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "../interfaces/IUniV4.sol";
@@ -24,25 +24,19 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
-/// @custom:mounted uint256 (external)
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
-/// @custom:mounted uint256 (external)
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-
 /// @author philogy <https://github.com/philogy>
-abstract contract PoolUpdateManager is
+abstract contract PoolUpdates is
     UniConsumer,
-    RewardsUpdater,
-    SettlementManager,
-    NodeManager,
+    GrowthOutsideUpdater,
+    Settlement,
+    TopLevelAuth,
     IBeforeAddLiquidityHook,
     IBeforeRemoveLiquidityHook
 {
-    using FormatLib for *;
-
+    using SafeTransferLib for address;
     using SafeCastLib for uint256;
 
     using IUniV4 for IPoolManager;
@@ -52,20 +46,18 @@ abstract contract PoolUpdateManager is
     Positions internal positions;
     mapping(PoolId id => PoolRewards) internal poolRewards;
 
-    constructor() {
-        _checkHookPermissions(Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
-    }
-
     /// @dev Maintain reward growth & `poolRewards` values such that no one's owed rewards change.
     function beforeAddLiquidity(
         address sender,
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata
-    ) external override onlyUniV4 returns (bytes4) {
+    ) external override returns (bytes4) {
+        _onlyUniV4();
+
         uint256 liquidityDelta = uint256(params.liquidityDelta);
 
-        PoolId id = ConversionLib.toId(key);
+        PoolId id = _toId(key);
         int24 lowerTick = params.tickLower;
         int24 upperTick = params.tickUpper;
         PoolRewards storage rewards = poolRewards[id];
@@ -108,10 +100,12 @@ abstract contract PoolUpdateManager is
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata
-    ) external override onlyUniV4 returns (bytes4) {
+    ) external override returns (bytes4) {
+        _onlyUniV4();
+
         uint256 liquidityDelta = params.liquidityDelta.neg();
 
-        PoolId id = ConversionLib.toId(key);
+        PoolId id = _toId(key);
         (Position storage position, bytes32 positionKey) =
             positions.get(id, sender, params.tickLower, params.tickUpper, params.salt);
         int24 currentTick = UNI_V4.getSlot0(id).tick();
@@ -121,7 +115,11 @@ abstract contract PoolUpdateManager is
         uint128 positionTotalLiquidity = UNI_V4.getPositionLiquidity(id, positionKey);
         uint256 rewards = growthInside.mulWad(positionTotalLiquidity) - position.pastRewards;
 
-        _settleRewardViaUniswapTo(sender, key.currency0, rewards);
+        if (rewards > 0) {
+            UNI_V4.sync(key.currency0);
+            Currency.unwrap(key.currency0).safeTransfer(address(UNI_V4), rewards);
+            UNI_V4.settleFor(sender);
+        }
 
         position.pastRewards =
             growthInside.mulWad(positionTotalLiquidity - liquidityDelta.toUint128());
@@ -129,26 +127,24 @@ abstract contract PoolUpdateManager is
         return this.beforeRemoveLiquidity.selector;
     }
 
-    function _updatePools(CalldataReader reader, DeltaTracker storage deltas, PairArray pairs)
+    function _updatePools(CalldataReader reader, PairArray pairs)
         internal
         returns (CalldataReader)
     {
         CalldataReader end;
         (reader, end) = reader.readU24End();
-        UniSwapCallBuffer memory swapCall = UniCallLib.newSwapCall(address(this));
+        SwapCall memory swapCall = SwapCallLib.newSwapCall(address(this));
         while (reader != end) {
-            reader = _updatePool(reader, swapCall, deltas, pairs);
+            reader = _updatePool(reader, swapCall, pairs);
         }
 
         return reader;
     }
 
-    function _updatePool(
-        CalldataReader reader,
-        UniSwapCallBuffer memory swapCall,
-        DeltaTracker storage deltas,
-        PairArray pairs
-    ) internal returns (CalldataReader) {
+    function _updatePool(CalldataReader reader, SwapCall memory swapCall, PairArray pairs)
+        internal
+        returns (CalldataReader)
+    {
         PoolUpdateVariantMap variantMap;
         {
             uint8 variantByte;
@@ -186,8 +182,16 @@ abstract contract PoolUpdateManager is
         (reader, rewardTotal) = _decodeAndReward(
             variantMap.currentOnly(), reader, poolRewards[id], id, swapCall.tickSpacing, currentTick
         );
-        deltas.sub(swapCall.asset0, rewardTotal);
+        bundleDeltas.sub(swapCall.asset0, rewardTotal);
 
         return reader;
+    }
+
+    function _toId(PoolKey calldata poolKey) internal pure returns (PoolId id) {
+        assembly ("memory-safe") {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, poolKey, mul(32, 5))
+            id := keccak256(ptr, mul(32, 5))
+        }
     }
 }
