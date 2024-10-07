@@ -62,6 +62,14 @@ where
     }
 
     pub fn gas_of_tob_order(&self, tob: &TopOfBlockOrder) -> Option<GasUsed> {
+        let res = self
+            .execute_on_revm(HashMap::default(), |evm| {
+                let a = 1;
+                evm.transact()
+
+                Ok(())
+            })
+            .ok()?;
         None
     }
 
