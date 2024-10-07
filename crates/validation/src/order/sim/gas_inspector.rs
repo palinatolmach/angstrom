@@ -9,10 +9,10 @@ pub type GasUsed = u64;
 /// the Gas Simulation Inspector allows us to define mutually exclusive ranges
 /// based on the EVM program counter and will store the gas used for execution
 /// in these ranges.
-pub struct GasSimulationInspector {
+pub struct GasSimulationInspector<'a> {
     results:             HashMap<(usize, usize), GasUsed>,
     /// A map from start pc to end pc.
-    measurement_ranges:  HashMap<usize, usize>,
+    measurement_ranges:  &'a HashMap<usize, usize>,
     // the current start of the pc we are measuring
     in_flight:           Option<usize>,
     in_flight_start_gas: Option<u64>,
@@ -20,8 +20,8 @@ pub struct GasSimulationInspector {
     angstrom_address:    Address
 }
 
-impl GasSimulationInspector {
-    pub fn new(angstrom_address: Address, measurement_ranges: HashMap<usize, usize>) -> Self {
+impl<'a> GasSimulationInspector<'a> {
+    pub fn new(angstrom_address: Address, measurement_ranges: &'a HashMap<usize, usize>) -> Self {
         Self {
             results: HashMap::default(),
             measurement_ranges,
@@ -30,9 +30,13 @@ impl GasSimulationInspector {
             in_flight_start_gas: None
         }
     }
+
+    pub fn into_gas_used(self) -> GasUsed {
+        self.results.into_values().sum()
+    }
 }
 
-impl<DB: Database> Inspector<DB> for GasSimulationInspector {
+impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
     fn step(
         &mut self,
         interp: &mut revm::interpreter::Interpreter,

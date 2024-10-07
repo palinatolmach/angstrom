@@ -35,39 +35,36 @@ where
 
     fn execute_on_revm<F>(
         &self,
-        offsets: HashMap<usize, usize>,
+        offsets: &HashMap<usize, usize>,
         f: F
-    ) -> eyre::Result<GasSimulationInspector>
+    ) -> eyre::Result<GasUsed>
     where
-        F: for<'a> FnOnce(
-            &'a mut Evm<'_, &mut GasSimulationInspector, WrapDatabaseRef<Arc<RevmLRU<DB>>>>
-        ) -> eyre::Result<()>
+        F: FnOnce(&mut EnvWithHandlerCfg)
     {
         let mut inspector = GasSimulationInspector::new(self.angstrom_address, offsets);
-        let evm_handler = EnvWithHandlerCfg::default();
+        let mut evm_handler = EnvWithHandlerCfg::default();
 
-        // scope so that lifetimes behave
-        {
-            let mut evm = revm::Evm::builder()
+        // install tx env
+        f(&mut evm_handler);
+        let mut evm = revm::Evm::builder()
                 .with_ref_db(self.db.clone())
                 .with_external_context(&mut inspector)
                 .with_env_with_handler_cfg(evm_handler)
                 .append_handler_register(inspector_handle_register)
                 .build();
+        let result = evm.transact()?;
 
-            f(&mut evm)?;
+        if !result.result.is_success() {
+            return Err(eyre::eyre!("gas simulation had a revert. cannot guarantee the proper gas was estimated"));
         }
 
-        Ok(inspector)
+        Ok(inspector.into_gas_used())
     }
 
     pub fn gas_of_tob_order(&self, tob: &TopOfBlockOrder) -> Option<GasUsed> {
         let res = self
-            .execute_on_revm(HashMap::default(), |evm| {
-                let a = 1;
-                evm.transact()
-
-                Ok(())
+            .execute_on_revm(&HashMap::default(), |execution_env| {
+                // execution_env.env.
             })
             .ok()?;
         None
