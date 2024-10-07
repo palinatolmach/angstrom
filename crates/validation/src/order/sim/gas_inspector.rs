@@ -16,7 +16,6 @@ pub struct GasSimulationInspector<'a> {
     // the current start of the pc we are measuring
     in_flight:           Option<usize>,
     in_flight_start_gas: Option<u64>,
-    /// the amount of instructions that have been run
     angstrom_address:    Address
 }
 
