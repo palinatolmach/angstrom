@@ -65,19 +65,18 @@ where
     }
 
     pub fn gas_of_tob_order(&self, tob: &TopOfBlockOrder) -> Result<GasUsed, GasSimulationError> {
-        let res = self
-            .execute_on_revm(&HashMap::default(), |execution_env| {
-                // execution_env.env.
-            })
-            .ok()?;
-        None
+        self.execute_on_revm(&HashMap::default(), |execution_env| {
+            // execution_env.env.
+        })
     }
 
     pub fn gas_of_book_order(
         &self,
         order: &GroupedVanillaOrder
     ) -> Result<GasUsed, GasSimulationError> {
-        None
+        self.execute_on_revm(&HashMap::default(), |execution_env| {
+            // execution_env.env.
+        })
     }
 }
 
