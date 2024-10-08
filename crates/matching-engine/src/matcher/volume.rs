@@ -2,7 +2,7 @@ use std::{cell::Cell, cmp::Ordering};
 
 use alloy::primitives::U256;
 use angstrom_types::{
-    matching::{Ray, SqrtPriceX96},
+    matching::{uniswap::PoolPrice, Ray, SqrtPriceX96},
     orders::{NetAmmOrder, OrderFillState, OrderOutcome, PoolSolution},
     sol_bindings::{
         grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
@@ -11,12 +11,9 @@ use angstrom_types::{
 };
 
 use super::Solution;
-use crate::{
-    book::{
-        order::{OrderContainer, OrderDirection, OrderExclusion},
-        OrderBook
-    },
-    cfmm::uniswap::MarketPrice
+use crate::book::{
+    order::{OrderContainer, OrderDirection, OrderExclusion},
+    OrderBook
 };
 
 type CrossPoolExclusions = Option<(Vec<Option<OrderExclusion>>, Vec<Option<OrderExclusion>>)>;
@@ -38,7 +35,7 @@ pub struct VolumeFillMatcher<'a> {
     ask_idx:          Cell<usize>,
     pub ask_outcomes: Vec<OrderFillState>,
     ask_xpool:        Vec<Option<OrderExclusion>>,
-    amm_price:        Option<MarketPrice<'a>>,
+    amm_price:        Option<PoolPrice<'a>>,
     amm_outcome:      Option<NetAmmOrder>,
     current_partial:  Option<OrderWithStorageData<GroupedVanillaOrder>>,
     results:          Solution,
@@ -59,7 +56,7 @@ impl<'a> VolumeFillMatcher<'a> {
             xpool.unwrap_or_else(|| (vec![None; book.bids().len()], vec![None; book.asks().len()]));
         let bid_outcomes = vec![OrderFillState::Unfilled; book.bids().len()];
         let ask_outcomes = vec![OrderFillState::Unfilled; book.asks().len()];
-        let amm_price = book.amm().map(|a| a.current_position());
+        let amm_price = book.amm().map(|a| a.current_price());
         Self {
             book,
             bid_idx: Cell::new(0),

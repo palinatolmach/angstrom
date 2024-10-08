@@ -4,8 +4,10 @@ mod state;
 
 use angstrom_types::{
     consensus::Proposal,
-    contract_payloads::angstrom::{
-        AngstromBundle, OrderQuantities, Pair, PoolUpdate, TopOfBlockOrder, UserOrder
+    contract_payloads::{
+        angstrom::{AngstromBundle, OrderQuantities, TopOfBlockOrder, UserOrder},
+        rewards::PoolUpdate,
+        Pair
     },
     matching::Ray,
     orders::{OrderFillState, OrderOutcome},
@@ -50,7 +52,7 @@ pub fn to_contract_format(
         // Build our Pair featuring our uniform clearing price
         // This price is in Ray format as requested.
         let uniswap_price: U256 = *solution.ucp;
-        pairs.push(Pair { t0_idx, t1_idx, uniswap_price });
+        // pairs.push(Pair { t0_idx, t1_idx, uniswap_price });
         let pair_idx = pairs.len() - 1;
 
         // Pull out our net AMM order
@@ -107,11 +109,11 @@ pub fn to_contract_format(
         );
         // Account for our reward
         asset_builder.allocate(AssetBuilderStage::Reward, t0, tob_outcome.total_reward.to());
-        let rewards_update = tob_outcome.to_donate(t0_idx, t1_idx).update;
+        let rewards_update = tob_outcome.to_rewards_update();
         // Push the pool update
         pool_updates.push(PoolUpdate {
-            asset_in_index,
-            asset_out_index,
+            zero_for_one: false,
+            pair_index: 0,
             swap_in_quantity: quantity_in,
             rewards_update
         });

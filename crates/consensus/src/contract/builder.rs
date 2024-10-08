@@ -1,4 +1,4 @@
-use angstrom_types::contract_payloads::tob::Asset;
+use angstrom_types::contract_payloads::Asset;
 use reth_primitives::Address;
 
 use super::{assetarray::AssetArray, state::StageTracker};

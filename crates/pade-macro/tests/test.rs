@@ -110,3 +110,24 @@ fn will_respect_item_width() {
     let decoded = TooBig::pade_decode(&mut slice, None).unwrap();
     assert_eq!(test_struct, decoded)
 }
+
+#[test]
+fn can_derive_on_generics() {
+    #[derive(PadeEncode, PadeDecode)]
+    struct GenTest<A: PadeEncode + PadeDecode> {
+        numbers: Vec<u8>,
+        items:   Vec<A>
+    }
+
+    #[derive(PadeEncode, PadeDecode)]
+    enum GenFlatEnum<A: PadeEncode + PadeDecode> {
+        Numbers(Vec<u8>),
+        Items(Vec<A>)
+    }
+
+    #[derive(PadeEncode, PadeDecode)]
+    enum GenStructEnum<A: PadeEncode + PadeDecode> {
+        Numbers { vector: Vec<u8> },
+        Items { vector: Vec<A> }
+    }
+}

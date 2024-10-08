@@ -9,6 +9,8 @@ repository.workspace = true
 exclude.workspace = true
 
 [dev-dependencies]
+pade.workspace = true
+pade-macro.workspace = true
 testing-tools.workspace = true
 divan = "0.1.14"
 

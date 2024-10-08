@@ -1142,7 +1142,6 @@ name = "angstrom-eth"
 version = "0.1.0"
 dependencies = [
  "alloy",
- "alloy-sol-types 0.7.7",
  "angstrom-types",
  "angstrom-utils",
  "anyhow",
@@ -1319,6 +1318,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
+ "uniswap_v3_math",
 ]
 
 [[package]]
@@ -2637,6 +2637,22 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "contract_test"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "angstrom-types",
+ "eyre",
+ "pade",
+ "pade-macro",
+ "testing-tools",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uniswap_v3_math",
 ]
 
 [[package]]
@@ -5781,6 +5797,7 @@ dependencies = [
  "alloy",
  "bitvec",
  "bytes",
+ "pade-macro",
 ]
 
 [[package]]

@@ -1,16 +1,11 @@
-use alloy::{
-    primitives::{Address, Bytes, B256},
-    sol
-};
+use alloy::primitives::{Address, Bytes, B256};
 use pade_macro::{PadeDecode, PadeEncode};
 use reth_primitives::keccak256;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    contract_payloads::tob::{Asset, RewardsUpdate},
-    sol_bindings::{
-        grouped_orders::OrderWithStorageData, rpc_orders::TopOfBlockOrder as RpcTopOfBlockOrder
-    }
+use super::{rewards::PoolUpdate, Asset, Pair};
+use crate::sol_bindings::{
+    grouped_orders::OrderWithStorageData, rpc_orders::TopOfBlockOrder as RpcTopOfBlockOrder
 };
 
 // This currently exists in types::sol_bindings as well, but that one is
@@ -89,23 +84,6 @@ pub struct UserOrder {
 impl UserOrder {
     pub fn order_hash(&self) -> B256 {
         keccak256(&self.signature)
-    }
-}
-
-sol! {
-    #[derive(Debug, PadeEncode, PadeDecode)]
-    struct Pair {
-        uint16 t1_idx;
-        uint16 t0_idx;
-        uint256 uniswap_price;
-    }
-
-    #[derive(Debug, PadeEncode, PadeDecode)]
-    struct PoolUpdate {
-        uint16 asset_in_index;
-        uint16 asset_out_index;
-        uint128 swap_in_quantity;
-        RewardsUpdate rewards_update;
     }
 }
 

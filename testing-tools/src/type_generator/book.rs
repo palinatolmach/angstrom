@@ -1,12 +1,9 @@
 use angstrom_types::{
-    matching::SqrtPriceX96,
+    matching::{uniswap::PoolSnapshot, SqrtPriceX96},
     primitive::PoolId,
     sol_bindings::grouped_orders::{GroupedVanillaOrder, OrderWithStorageData}
 };
-use matching_engine::{
-    book::{sort::SortStrategy, OrderBook},
-    cfmm::uniswap::MarketSnapshot
-};
+use matching_engine::book::{sort::SortStrategy, OrderBook};
 use uniswap_v3_math::tick_math::get_tick_at_sqrt_ratio;
 
 use super::{
@@ -18,7 +15,7 @@ use super::{
 #[derive(Default)]
 pub struct BookBuilder {
     _poolid: Option<PoolId>,
-    _amm:    Option<MarketSnapshot>,
+    _amm:    Option<PoolSnapshot>,
     _bids:   Option<Vec<OrderWithStorageData<GroupedVanillaOrder>>>,
     _asks:   Option<Vec<OrderWithStorageData<GroupedVanillaOrder>>>,
     _sort:   Option<SortStrategy>
@@ -43,7 +40,7 @@ impl BookBuilder {
         self
     }
 
-    pub fn amm(mut self, amm: Option<MarketSnapshot>) -> Self {
+    pub fn amm(mut self, amm: Option<PoolSnapshot>) -> Self {
         self._amm = amm;
         self
     }

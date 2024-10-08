@@ -37,6 +37,7 @@ use reth::{
     args::utils::DefaultChainSpecParser,
     builder::{FullNodeComponents, Node},
     cli::Cli,
+    primitives::Address,
     providers::CanonStateSubscriptions,
     tasks::TaskExecutor
 };

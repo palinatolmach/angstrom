@@ -8,7 +8,10 @@ use alloy::{
     rpc::types::eth::{Block, Filter}
 };
 use amms::{amm::AutomatedMarketMaker, errors::EventLogError};
-use angstrom_types::matching::SqrtPriceX96;
+use angstrom_types::matching::{
+    uniswap::{LiqRange, PoolSnapshot},
+    SqrtPriceX96
+};
 use arraydeque::ArrayDeque;
 use eyre::Error;
 use futures::StreamExt;
@@ -23,7 +26,7 @@ use tokio::{
     task::JoinHandle
 };
 
-use super::{pool::SwapSimulationError, MarketSnapshot, PoolRange};
+use super::pool::SwapSimulationError;
 use crate::cfmm::uniswap::{pool::EnhancedUniswapV3Pool, pool_providers::PoolManagerProvider};
 
 pub type StateChangeCache = ArrayDeque<StateChange, 150>;
@@ -254,7 +257,7 @@ where
         )
     }
 
-    pub fn get_market_snapshot(&self) -> Result<MarketSnapshot, Error> {
+    pub fn get_market_snapshot(&self) -> Result<PoolSnapshot, Error> {
         let (ranges, price) = {
             let pool_lock = self.pool.blocking_read();
             // Grab all ticks with any change in liquidity from our underlying pool data
@@ -272,14 +275,14 @@ where
                     let lower_tick = tickwindow[0].0;
                     let upper_tick = tickwindow[1].0;
                     let liquidity = tickwindow[0].1.liquidity_gross;
-                    PoolRange::new(*lower_tick, *upper_tick, liquidity)
+                    LiqRange::new(*lower_tick, *upper_tick, liquidity)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             // Get our starting price
             let price = SqrtPriceX96::from(pool_lock.sqrt_price);
             (ranges, price)
         };
-        MarketSnapshot::new(ranges, price)
+        PoolSnapshot::new(ranges, price)
     }
 }
 

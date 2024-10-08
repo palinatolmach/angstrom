@@ -1,5 +1,5 @@
 [package]
-name = "angstrom-eth"
+name = "contract_test"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,24 +8,14 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
-
 [dependencies]
 angstrom-types.workspace = true
-angstrom-utils.workspace = true
-pade.workspace = true
-
+testing-tools.workspace = true
 tokio.workspace = true
-futures.workspace = true
-tokio-stream.workspace = true
-futures-util.workspace = true
-
-# reth
-reth-provider.workspace = true
-reth-tasks.workspace = true
-
-# alloy  
+uniswap_v3_math.workspace = true
 alloy.workspace = true
-
-
-# misc
-anyhow.workspace = true
+pade.workspace = true
+pade-macro.workspace = true
+eyre.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

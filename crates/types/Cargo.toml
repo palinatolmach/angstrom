@@ -33,6 +33,7 @@ bincode = { workspace = true }
 serde = { workspace = true, optional = true, default-features = false, features = [
   "derive",
 ] }
+uniswap_v3_math.workspace = true
 
 rand = { version = "0.8.5", optional = true }
 

@@ -1,4 +1,5 @@
 use angstrom_types::{
+    matching::uniswap::PoolPriceVec,
     orders::{OrderID, OrderId, OrderPrice, OrderVolume},
     primitive::PoolId,
     sol_bindings::{
@@ -11,7 +12,6 @@ use angstrom_types::{
 
 /// Definition of the various types of order that we can serve, as well as the
 /// outcomes we're able to have for them
-use crate::cfmm::uniswap::PriceRange;
 
 #[derive(Clone, Debug)]
 pub struct OrderCoordinate {
@@ -77,7 +77,7 @@ pub enum OrderContainer<'a, 'b> {
     /// A fragment of an order from our book yet to be filled
     BookOrderFragment(&'b OrderWithStorageData<GroupedVanillaOrder>),
     /// An order constructed from the current state of our AMM
-    AMM(PriceRange<'a>)
+    AMM(PoolPriceVec<'a>)
 }
 
 impl<'a, 'b> OrderContainer<'a, 'b> {
@@ -153,7 +153,7 @@ impl<'a, 'b> OrderContainer<'a, 'b> {
 pub enum Order<'a> {
     KillOrFill(FlashOrder),
     PartialFill(StandingOrder),
-    AMM(PriceRange<'a>)
+    AMM(PoolPriceVec<'a>)
 }
 
 impl<'a> Order<'a> {

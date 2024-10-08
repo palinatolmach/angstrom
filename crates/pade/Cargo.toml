@@ -10,5 +10,6 @@ exclude.workspace = true
 
 [dependencies]
 bitvec = "1.0.1"
+pade-macro.workspace = true
 bytes = "1.7.2"
 alloy.workspace = true

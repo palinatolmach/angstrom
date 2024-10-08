@@ -1,5 +1,6 @@
 //! basic book impl so we can benchmark
 use angstrom_types::{
+    matching::uniswap::PoolSnapshot,
     orders::OrderId,
     primitive::PoolId,
     sol_bindings::grouped_orders::{GroupedVanillaOrder, OrderWithStorageData}
@@ -7,7 +8,6 @@ use angstrom_types::{
 use order::{OrderCoordinate, OrderDirection};
 
 use self::sort::SortStrategy;
-use crate::cfmm::uniswap::MarketSnapshot;
 
 pub mod order;
 pub mod sort;
@@ -16,7 +16,7 @@ pub mod xpool;
 #[derive(Debug, Default)]
 pub struct OrderBook {
     id:   PoolId,
-    amm:  Option<MarketSnapshot>,
+    amm:  Option<PoolSnapshot>,
     bids: Vec<OrderWithStorageData<GroupedVanillaOrder>>,
     asks: Vec<OrderWithStorageData<GroupedVanillaOrder>>
 }
@@ -24,7 +24,7 @@ pub struct OrderBook {
 impl OrderBook {
     pub fn new(
         id: PoolId,
-        amm: Option<MarketSnapshot>,
+        amm: Option<PoolSnapshot>,
         mut bids: Vec<OrderWithStorageData<GroupedVanillaOrder>>,
         mut asks: Vec<OrderWithStorageData<GroupedVanillaOrder>>,
         sort: Option<SortStrategy>
@@ -48,7 +48,7 @@ impl OrderBook {
         &self.asks
     }
 
-    pub fn amm(&self) -> Option<&MarketSnapshot> {
+    pub fn amm(&self) -> Option<&PoolSnapshot> {
         self.amm.as_ref()
     }
 
@@ -91,7 +91,7 @@ mod test {
         // Very basic book construction test
         let bids = vec![];
         let asks = vec![];
-        let amm = MarketSnapshot::new(vec![], SqrtPriceX96::from_float_price(0.0)).unwrap();
+        let amm = PoolSnapshot::new(vec![], SqrtPriceX96::from_float_price(0.0)).unwrap();
         OrderBook::new(FixedBytes::<32>::random(), Some(amm), bids, asks, None);
     }
 }

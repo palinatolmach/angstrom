@@ -7,6 +7,7 @@ use alloy::primitives::U256;
 
 mod ray;
 mod sqrtprice;
+pub mod uniswap;
 
 use malachite::{
     num::{arithmetic::traits::PowerOf2, conversion::traits::FromSciString},
