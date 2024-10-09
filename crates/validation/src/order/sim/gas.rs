@@ -2,7 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use alloy::primitives::Address;
 use angstrom_types::sol_bindings::{
-    grouped_orders::GroupedVanillaOrder, rpc_orders::TopOfBlockOrder
+    grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
+    rpc_orders::TopOfBlockOrder
 };
 use revm::{
     db::WrapDatabaseRef, handler::register::EvmHandler, inspector_handle_register,
@@ -64,7 +65,10 @@ where
         Ok(inspector.into_gas_used())
     }
 
-    pub fn gas_of_tob_order(&self, tob: &TopOfBlockOrder) -> Result<GasUsed, GasSimulationError> {
+    pub fn gas_of_tob_order(
+        &self,
+        tob: &OrderWithStorageData<TopOfBlockOrder>
+    ) -> Result<GasUsed, GasSimulationError> {
         self.execute_on_revm(&HashMap::default(), |execution_env| {
             // execution_env.env.
         })
