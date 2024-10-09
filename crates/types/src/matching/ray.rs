@@ -143,19 +143,19 @@ impl Ray {
         self.into()
     }
 
-    /// Calculates a price ratio t0/t1
+    /// Calculates a price ratio t1/t0
     pub fn calc_price(t0: U256, t1: U256) -> Self {
-        let numerator = Natural::from_limbs_asc(t0.as_limbs()) * const_1e27();
-        let denominator = Natural::from_limbs_asc(t1.as_limbs());
+        let numerator = Natural::from_limbs_asc(t1.as_limbs()) * const_1e27();
+        let denominator = Natural::from_limbs_asc(t0.as_limbs());
         let output = Rational::from_naturals(numerator, denominator);
-        let (natout, _): (Natural, _) = output.rounding_into(RoundingMode::Ceiling);
+        let (natout, _): (Natural, _) = output.rounding_into(RoundingMode::Floor);
         let limbs = natout.limbs().collect::<Vec<_>>();
         let inner = U256::from_limbs_slice(&limbs);
         Self(inner)
     }
 
-    /// Given a price ratio t0/t1 calculates how much t0 would be needed to
-    /// output the provided amount of t1 (q)
+    /// Given a price ratio t1/t0 calculates how much t1 would be needed to
+    /// output the provided amount of t0 (q)
     pub fn mul_quantity(&self, q: U256) -> U256 {
         let p: U512 = self.0.widening_mul(q);
         let numerator = Natural::from_limbs_asc(p.as_limbs());
@@ -165,8 +165,8 @@ impl Ray {
         Uint::from_limbs_slice(&reslimbs)
     }
 
-    /// Given a price ratio t0/t1 calculates how much t1 would be needed to
-    /// output the provided amount of t0 (q)
+    /// Given a price ratio t1/t0 calculates how much t0 would be needed to
+    /// output the provided amount of t1 (q)
     pub fn inverse_quantity(&self, q: U256) -> U256 {
         let numerator = Natural::from_limbs_asc(q.as_limbs()) * const_1e27();
         let denominator = Natural::from_limbs_asc(self.0.as_limbs());

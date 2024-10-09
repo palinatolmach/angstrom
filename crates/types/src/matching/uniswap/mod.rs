@@ -15,6 +15,31 @@ pub enum Quantity {
     Token1(u128)
 }
 
+impl Quantity {
+    pub fn magnitude(&self) -> u128 {
+        match self {
+            Self::Token0(q) => *q,
+            Self::Token1(q) => *q
+        }
+    }
+
+    /// The direction of the swap if this quantity is used as input
+    pub fn as_input(&self) -> Direction {
+        match self {
+            Self::Token0(_) => Direction::SellingT0,
+            Self::Token1(_) => Direction::BuyingT0
+        }
+    }
+
+    /// The direction of the swap if this quantity is used as output
+    pub fn as_output(&self) -> Direction {
+        match self {
+            Self::Token0(_) => Direction::BuyingT0,
+            Self::Token1(_) => Direction::SellingT0
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum Direction {
     /// When buying T0, the price will go up and the tick number will increase
@@ -34,6 +59,25 @@ impl Direction {
 
     pub fn is_bid(&self) -> bool {
         matches!(self, Self::BuyingT0)
+    }
+
+    /// Returns true if the given quantity is on the input side of this
+    /// direction
+    pub fn is_input(&self, q: &Quantity) -> bool {
+        match (self, q) {
+            (Self::BuyingT0, Quantity::Token1(_)) => true,
+            (Self::SellingT0, Quantity::Token0(_)) => true,
+            _ => false
+        }
+    }
+
+    /// Given our transaction direction, turns (amount_in, amount_out) into
+    /// (token0, token1) for use when working with a uniswap pool
+    pub fn sort_tokens<T>(&self, amount_in: T, amount_out: T) -> (T, T) {
+        match self {
+            Self::BuyingT0 => (amount_out, amount_in),
+            Self::SellingT0 => (amount_in, amount_out)
+        }
     }
 }
 

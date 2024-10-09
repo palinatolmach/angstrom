@@ -1,17 +1,19 @@
 use std::{
     cmp::{max, min},
-    collections::HashMap
+    ops::{Add, Sub}
 };
 
 use alloy::primitives::U256;
 use eyre::OptionExt;
 use uniswap_v3_math::tick_math::{get_sqrt_ratio_at_tick, get_tick_at_sqrt_ratio};
 
-use super::{liqrange::LiqRangeRef, poolpricevec::PoolPriceVec, Tick};
+use super::{liqrange::LiqRangeRef, poolpricevec::PoolPriceVec, Quantity, Tick};
 use crate::matching::SqrtPriceX96;
-
+/// Representation of a specific price point in a Uniswap Pool.  Can be operated
+/// on to simulate the behavior of the price withing said pool.
+///
 /// A PoolPrice represents a price based on the market state preserved in a
-/// parent MarketSnapshot.  The PoolPrice can be moved and operated on to
+/// parent PoolSnapshot.  The PoolPrice can be moved and operated on to
 /// simulate the behavior of the price if the underlying assets are bought and
 /// sold.  This price will always depend on a specific PoolSnapshot so if
 /// underlying parameters such as Liquidity or the decimal representation of the
@@ -20,11 +22,11 @@ use crate::matching::SqrtPriceX96;
 #[derive(Clone, Debug)]
 pub struct PoolPrice<'a> {
     /// Current PoolRange that the price is in
-    pub(crate) market_pool: LiqRangeRef<'a>,
+    pub(crate) liq_range: LiqRangeRef<'a>,
     /// Tick number within the current PoolRange that we're working with
-    pub(crate) tick:        Tick,
+    pub(crate) tick:      Tick,
     /// The ratio between Token0 and Token1
-    pub(crate) price:       SqrtPriceX96
+    pub(crate) price:     SqrtPriceX96
 }
 
 impl<'a> PoolPrice<'a> {
@@ -42,18 +44,6 @@ impl<'a> PoolPrice<'a> {
         self.order_to_target(None, true)
     }
 
-    /// Buy from the AMM with a quantity of the input token that exceeds the
-    /// amount required to purchase the requested quantity of the output token.
-    /// The excess quantity is distributed as our "bribe" to the LPs present in
-    /// each tick based on our ToB distribution algorithm.
-    pub fn buy_and_bribe(
-        &self,
-        _input: U256,
-        _output: U256
-    ) -> Result<(Self, HashMap<Tick, U256>), String> {
-        Ok((self.clone(), HashMap::new()))
-    }
-
     pub fn sell_to_price(&self, target_price: SqrtPriceX96) -> Option<PoolPriceVec<'a>> {
         self.order_to_target(Some(target_price), false)
     }
@@ -67,21 +57,21 @@ impl<'a> PoolPrice<'a> {
     }
 
     pub fn liquidity_range(&self) -> LiqRangeRef<'a> {
-        self.market_pool
+        self.liq_range
     }
 
     pub fn liquidity(&self) -> u128 {
-        self.market_pool.liquidity
+        self.liq_range.liquidity
     }
 
     pub fn range_to(&self, price: SqrtPriceX96) -> eyre::Result<PoolPriceVec<'a>> {
         let tick = price.to_tick()?;
         let market_pool = self
-            .market_pool
-            .market
+            .liq_range
+            .pool_snap
             .get_range_for_tick(tick)
             .ok_or_eyre("Unable to find pool")?;
-        let target = Self { market_pool, tick, price };
+        let target = Self { liq_range: market_pool, tick, price };
         Ok(PoolPriceVec::new(self.clone(), target))
     }
 
@@ -109,30 +99,30 @@ impl<'a> PoolPrice<'a> {
             }
         }
         let bound_price = if buy {
-            SqrtPriceX96::at_tick(self.market_pool.upper_tick).ok()?
+            SqrtPriceX96::at_tick(self.liq_range.upper_tick).ok()?
         } else {
-            SqrtPriceX96::at_tick(self.market_pool.lower_tick).ok()?
+            SqrtPriceX96::at_tick(self.liq_range.lower_tick).ok()?
         };
 
-        let mut new_range_idx = self.market_pool.range_idx;
-        let mut pool = self.market_pool.range;
+        let mut new_range_idx = self.liq_range.range_idx;
+        let mut pool = self.liq_range.range;
         let (mut tick_bound_price, next_tick) = if buy {
             let upper_tick_price = get_sqrt_ratio_at_tick(pool.upper_tick)
                 .ok()
                 .map(SqrtPriceX96::from)?;
-            let next_tick = self.market_pool.range_idx.checked_sub(1);
+            let next_tick = self.liq_range.range_idx.checked_sub(1);
             (upper_tick_price, next_tick)
         } else {
             let lower_tick_price = get_sqrt_ratio_at_tick(pool.lower_tick)
                 .ok()
                 .map(SqrtPriceX96::from)?;
-            let next_tick = self.market_pool.range_idx.checked_add(1);
+            let next_tick = self.liq_range.range_idx.checked_add(1);
             (lower_tick_price, next_tick)
         };
         if self.price == tick_bound_price {
             // We're at the tick bound, we need to look at the next pool!
             new_range_idx = next_tick?;
-            pool = self.market_pool.market.ranges.get(new_range_idx)?;
+            pool = self.liq_range.pool_snap.ranges.get(new_range_idx)?;
             tick_bound_price = if buy {
                 get_sqrt_ratio_at_tick(pool.upper_tick)
                     .ok()
@@ -153,9 +143,9 @@ impl<'a> PoolPrice<'a> {
             tick_bound_price
         };
         let end_bound = Self {
-            market_pool: LiqRangeRef { range: pool, range_idx: new_range_idx, ..self.market_pool },
-            price:       closest_price,
-            tick:        get_tick_at_sqrt_ratio(closest_price.into()).ok()?
+            liq_range: LiqRangeRef { range: pool, range_idx: new_range_idx, ..self.liq_range },
+            price:     closest_price,
+            tick:      get_tick_at_sqrt_ratio(closest_price.into()).ok()?
         };
         Some(PoolPriceVec::new(self.clone(), end_bound))
     }
@@ -164,17 +154,35 @@ impl<'a> PoolPrice<'a> {
         &self.price
     }
 
+    /// Return the current SqrtPriceX96 structure
     pub fn as_sqrtpricex96(&self) -> SqrtPriceX96 {
         self.price
     }
 
-    /// Return the current price as a float - we need to figure out what our
-    /// price representation is going to look like overall
+    /// Return the current price (NOT sqrt) as a float by calling SqrtPriceX86's
+    /// `as_f64` method
     pub fn as_float(&self) -> f64 {
         self.price.as_f64()
     }
 
+    /// Return the current SqrtPriceX96 as a U256 without conversion
     pub fn as_u256(&self) -> U256 {
         self.price.into()
+    }
+}
+
+impl<'a> Add<Quantity> for PoolPrice<'a> {
+    type Output = eyre::Result<PoolPriceVec<'a>>;
+
+    fn add(self, rhs: Quantity) -> Self::Output {
+        PoolPriceVec::from_swap(self, rhs.as_input(), rhs)
+    }
+}
+
+impl<'a> Sub<Quantity> for PoolPrice<'a> {
+    type Output = eyre::Result<PoolPriceVec<'a>>;
+
+    fn sub(self, rhs: Quantity) -> Self::Output {
+        PoolPriceVec::from_swap(self, rhs.as_output(), rhs)
     }
 }

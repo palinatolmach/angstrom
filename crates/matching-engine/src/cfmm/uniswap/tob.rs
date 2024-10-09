@@ -4,7 +4,7 @@ use alloy::primitives::{aliases::I24, I256, U256};
 use angstrom_types::{
     contract_payloads::rewards::RewardsUpdate,
     matching::{
-        uniswap::{Direction, PoolSnapshot, Tick},
+        uniswap::{Direction, PoolSnapshot, Quantity, Tick},
         Ray, SqrtPriceX96
     },
     sol_bindings::{grouped_orders::OrderWithStorageData, rpc_orders::TopOfBlockOrder}
@@ -12,7 +12,7 @@ use angstrom_types::{
 use eyre::{eyre, Context, OptionExt};
 use uniswap_v3_math::swap_math::compute_swap_step;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ToBOutcome {
     pub start_tick:      i32,
     pub start_liquidity: u128,
@@ -63,6 +63,32 @@ impl ToBOutcome {
     }
 }
 
+pub fn new_reward(
+    tob: &OrderWithStorageData<TopOfBlockOrder>,
+    amm: &PoolSnapshot
+) -> eyre::Result<ToBOutcome> {
+    let output = match tob.is_bid {
+        true => Quantity::Token0(tob.quantityOut),
+        false => Quantity::Token1(tob.quantityOut)
+    };
+    let pricevec = (amm.current_price() - output)?;
+    println!("Total cost: {}\tquantityIn: {}", pricevec.input(), tob.quantityIn);
+    let total_cost: u128 = pricevec.input().saturating_to();
+    if total_cost > tob.quantityIn {
+        return Err(eyre!("Not enough input to cover the transaction"));
+    }
+    let leftover = tob.quantityIn - total_cost;
+    let donation = pricevec.donation(leftover);
+    Ok(ToBOutcome {
+        start_tick:      amm.current_price().tick(),
+        start_liquidity: amm.current_price().liquidity(),
+        tribute:         U256::from(donation.tribute),
+        total_cost:      pricevec.input(),
+        total_reward:    U256::from(donation.total_donated),
+        tick_donations:  donation.tick_donations
+    })
+}
+
 pub fn calculate_reward(
     tob: &OrderWithStorageData<TopOfBlockOrder>,
     amm: PoolSnapshot
@@ -102,6 +128,7 @@ pub fn calculate_reward(
         // Update our current liquidiy range
         let liq_range =
             current_liq_range.ok_or_else(|| eyre!("Unable to find next liquidity range"))?;
+        println!("Operating on liq range [{}..{})", liq_range.lower_tick(), liq_range.upper_tick());
         // Compute our swap towards the appropriate end of our current liquidity bound
         let target_tick = liq_range.end_bound(direction);
         let target_price = SqrtPriceX96::at_tick(target_tick)?;
@@ -134,6 +161,8 @@ pub fn calculate_reward(
         // How much should this have cost if it was done by the raw price
         let end_price = Ray::from(SqrtPriceX96::from(fin_price));
 
+        println!("S price: {}\nT price: {}\nE price: {}", *current_price, *target_price, fin_price);
+
         // This seems to work properly, so let's run with it
         let avg_price = Ray::calc_price(amount_in, amount_out);
 
@@ -143,6 +172,7 @@ pub fn calculate_reward(
         // If we're going to be continuing, move on to the next liquidity range
         current_liq_range = liq_range.next(direction);
         current_price = SqrtPriceX96::from(fin_price);
+        println!("C: {}\nF: {}", *current_price, fin_price);
     }
 
     // Determine how much extra quantityIn we have that will be used as tribute to
@@ -178,6 +208,7 @@ pub fn calculate_reward(
         // were sold at our target price
         let step_cost = d_price.mul_quantity(q_step);
 
+        println!("Rem: {}\tCost: {}", rem_bribe, step_cost);
         if rem_bribe >= step_cost {
             // If we have enough bribe to pay the whole cost, allocate that and step forward
             // to the next price gap
@@ -187,8 +218,10 @@ pub fn calculate_reward(
         } else {
             // If we don't have enough bribe to pay the whole cost, figure out where the
             // target price winds up based on what we do have and end this iteration
-            let partial_dprice = Ray::calc_price(rem_bribe, q_step);
-            filled_price += partial_dprice;
+            if rem_bribe > U256::ZERO {
+                let partial_dprice = Ray::calc_price(rem_bribe, q_step);
+                filled_price += partial_dprice;
+            }
             break
         }
     }
@@ -233,7 +266,7 @@ pub fn calculate_reward(
 mod test {
     use alloy::primitives::Uint;
     use angstrom_types::matching::{
-        uniswap::{LiqRange, PoolSnapshot},
+        uniswap::{LiqRange, PoolSnapshot, Quantity},
         SqrtPriceX96
     };
     use rand::thread_rng;
@@ -241,6 +274,7 @@ mod test {
     use uniswap_v3_math::tick_math::get_sqrt_ratio_at_tick;
 
     use super::calculate_reward;
+    use crate::cfmm::uniswap::tob::new_reward;
 
     fn generate_amm_market(target_tick: i32) -> PoolSnapshot {
         let range =
@@ -263,6 +297,7 @@ mod test {
             Some(total_payment),
             Some(100000000_u128)
         );
+        let newresult = new_reward(&order, &amm).unwrap();
         let result = calculate_reward(&order, amm).expect("Error calculating tick donations");
         let total_donations = result.total_donations();
         assert_eq!(
@@ -270,6 +305,7 @@ mod test {
             Uint::from(total_payment),
             "Total allocations do not add up to input payment"
         );
+        assert_eq!(result, newresult, "New result not equal");
     }
 
     #[test]
@@ -284,11 +320,13 @@ mod test {
             Some(10_000_000_u128),
             Some(100000000_u128)
         );
+        let newresult = new_reward(&order, &amm);
         let result = calculate_reward(&order, amm);
         assert!(result.is_err_and(|e| {
             e.to_string()
                 .starts_with("Total cost greater than amount offered")
-        }))
+        }));
+        assert!(newresult.is_err());
     }
 
     #[test]
@@ -306,6 +344,7 @@ mod test {
             Some(total_payment),
             Some(100000000_u128)
         );
+        let newresult = new_reward(&order, &amm).unwrap();
         let result = calculate_reward(&order, amm).expect("Error calculating tick donations");
         let total_donations = result.total_donations();
         assert!(
@@ -317,6 +356,7 @@ mod test {
             Uint::from(total_payment),
             "Total allocations do not add up to input payment"
         );
+        assert_eq!(result, newresult, "New result not equal");
     }
 
     #[test]
@@ -330,7 +370,8 @@ mod test {
             LiqRange::new(100002, 100003, liquidity).unwrap(),
         ];
         let amm = PoolSnapshot::new(ranges, price).unwrap();
-        let total_payment = 2_202_072_310_000_u128;
+        let total_payment = 2_201_872_310_000_u128; // + 20_000_000_u128;
+                                                    //let total_payment = 2_202_072_310_000_u128;
         let order = generate_top_of_block_order(
             &mut rng,
             true,
@@ -339,7 +380,9 @@ mod test {
             Some(total_payment),
             Some(100000000_u128)
         );
+        //let newresult = new_reward(&order, &amm).unwrap();
         let result = calculate_reward(&order, amm).expect("Error calculating tick donations");
+        println!("Result: {:?}", result);
         let total_donations = result.total_donations();
         assert!(result.tick_donations.contains_key(&100000), "Donation to first tick missing");
         assert!(result.tick_donations.contains_key(&100001), "Donation to second tick missing");
@@ -352,6 +395,7 @@ mod test {
             Uint::from(total_payment),
             "Total allocations do not add up to input payment"
         );
+        //assert_eq!(result, newresult, "New result not equal");
     }
 
     #[test]
@@ -366,8 +410,10 @@ mod test {
             Some(10_000_000_000_000_u128),
             Some(100000000_u128)
         );
+        let newresult = new_reward(&order, &amm);
         let result = calculate_reward(&order, amm);
         assert!(result.is_ok());
+        assert!(newresult.is_ok());
     }
 
     #[test]
@@ -382,8 +428,10 @@ mod test {
             Some(10_000_000_000_000_u128),
             Some(800000000_u128)
         );
+        let newresult = new_reward(&order, &amm);
         let result = calculate_reward(&order, amm);
         assert!(result.is_ok());
+        assert!(newresult.is_ok());
     }
 
     #[test]
@@ -400,6 +448,7 @@ mod test {
             Some(100000000_u128)
         );
         let first_tick = 100000 - 1000;
+        let newresult = new_reward(&order, &amm).unwrap();
         let result = calculate_reward(&order, amm).expect("Error calculating tick donations");
         assert!(
             result.tick_donations.len() == 1,
@@ -409,5 +458,24 @@ mod test {
             result.tick_donations.contains_key(&first_tick),
             "Donation not made to only initialized tick"
         );
+        assert_eq!(result, newresult, "New result not equal");
+    }
+
+    #[test]
+    fn use_new_constructs() {
+        let price = SqrtPriceX96::from(get_sqrt_ratio_at_tick(100000).unwrap());
+        let liquidity = 100_000_000_000_000;
+        let ranges = vec![
+            LiqRange::new(100000, 100001, liquidity).unwrap(),
+            LiqRange::new(100001, 100002, liquidity).unwrap(),
+            LiqRange::new(100002, 100003, liquidity).unwrap(),
+        ];
+        let amm = PoolSnapshot::new(ranges, price).unwrap();
+        // let amm = generate_amm_market(100000);
+        let pricevec = (amm.current_price() - Quantity::Token0(100_000_000_u128)).unwrap();
+        let steps = pricevec.steps();
+        println!("Steps: {:?}", steps);
+        let donate = pricevec.donation(50002);
+        println!("Donation: {:?}", donate);
     }
 }

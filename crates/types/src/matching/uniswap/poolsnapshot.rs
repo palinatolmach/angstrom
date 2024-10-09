@@ -66,7 +66,7 @@ impl PoolSnapshot {
             .iter()
             .enumerate()
             .find(|(_, r)| r.lower_tick <= tick && tick < r.upper_tick)
-            .map(|(range_idx, range)| LiqRangeRef { market: self, range, range_idx })
+            .map(|(range_idx, range)| LiqRangeRef { pool_snap: self, range, range_idx })
     }
 
     /// Return a read-only iterator over the liquidity ranges in this snapshot
@@ -78,13 +78,9 @@ impl PoolSnapshot {
         let range = self
             .ranges
             .get(self.cur_tick_idx)
-            .map(|range| LiqRangeRef { market: self, range, range_idx: self.cur_tick_idx })
+            .map(|range| LiqRangeRef { pool_snap: self, range, range_idx: self.cur_tick_idx })
             .unwrap();
-        PoolPrice {
-            market_pool: range,
-            tick:        self.current_tick,
-            price:       self.sqrt_price_x96
-        }
+        PoolPrice { liq_range: range, tick: self.current_tick, price: self.sqrt_price_x96 }
     }
 
     pub fn at_price(&self, price: SqrtPriceX96) -> eyre::Result<PoolPrice> {
@@ -92,7 +88,7 @@ impl PoolSnapshot {
         let range = self
             .get_range_for_tick(tick)
             .ok_or_eyre("Unable to find tick range for price")?;
-        Ok(PoolPrice { market_pool: range, tick, price })
+        Ok(PoolPrice { liq_range: range, tick, price })
     }
 
     pub fn liquidity_at_tick(&self, tick: Tick) -> Option<u128> {

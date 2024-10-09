@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 // use bincode::{config::standard, encode_to_vec, Decode, Encode};
 use alloy::primitives::keccak256;
 use bytes::Bytes;
@@ -7,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     orders::OrderSet,
-    primitive::Signature,
+    primitive::{PoolId, Signature},
     sol_bindings::{
         grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
         rpc_orders::TopOfBlockOrder
@@ -76,6 +78,19 @@ impl PreProposal {
         buf.extend(bincode::serialize(&self.limit).unwrap());
         buf.extend(bincode::serialize(&self.searcher).unwrap());
         Bytes::from_iter(buf)
+    }
+
+    pub fn orders_by_pool_id(
+        preproposals: &[PreProposal]
+    ) -> HashMap<PoolId, HashSet<OrderWithStorageData<GroupedVanillaOrder>>> {
+        preproposals
+            .iter()
+            .flat_map(|p| p.limit.iter())
+            .cloned()
+            .fold(HashMap::new(), |mut acc, order| {
+                acc.entry(order.pool_id).or_default().insert(order);
+                acc
+            })
     }
 }
 

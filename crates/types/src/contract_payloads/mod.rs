@@ -2,7 +2,9 @@ use alloy::sol;
 use pade_macro::{PadeDecode, PadeEncode};
 
 pub mod angstrom;
+pub mod asset;
 pub mod rewards;
+pub mod tob;
 
 sol! {
     #[derive(Debug, PadeEncode, PadeDecode)]
