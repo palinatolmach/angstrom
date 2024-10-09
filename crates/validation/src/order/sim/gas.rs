@@ -5,9 +5,10 @@ use angstrom_types::sol_bindings::{
     grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
     rpc_orders::TopOfBlockOrder
 };
+use reth_primitives::transaction::FillTxEnv;
 use revm::{
     db::WrapDatabaseRef, handler::register::EvmHandler, inspector_handle_register,
-    interpreter::Gas, primitives::EnvWithHandlerCfg, Evm
+    interpreter::Gas, primitives::{EnvWithHandlerCfg, TxEnv}, Evm
 };
 
 use super::gas_inspector::{GasSimulationInspector, GasUsed};
@@ -23,7 +24,7 @@ use crate::{BlockStateProviderFactory, RevmLRU};
 /// (Bundle execution cost - Sum(Orders Gas payed)) / len(Orders)
 pub struct OrderGasCalculations<DB> {
     db:               Arc<RevmLRU<DB>>,
-    angstrom_address: Address
+    angstrom_address: Address,
 }
 
 impl<DB> OrderGasCalculations<DB>
@@ -33,6 +34,7 @@ where
     pub fn new(db: Arc<RevmLRU<DB>>, angstrom_address: Address) -> Self {
         Self { db, angstrom_address }
     }
+
 
     fn execute_on_revm<F>(
         &self,
@@ -52,6 +54,9 @@ where
             .with_external_context(&mut inspector)
             .with_env_with_handler_cfg(evm_handler)
             .append_handler_register(inspector_handle_register)
+            .modify_env(|env| {
+                env.cfg.disable_balance_check = true;
+            })
             .build();
 
         let result = evm.transact()?;
@@ -70,15 +75,15 @@ where
         tob: &OrderWithStorageData<TopOfBlockOrder>
     ) -> Result<GasUsed, GasSimulationError> {
         self.execute_on_revm(&HashMap::default(), |execution_env| {
-            // execution_env.env.
         })
     }
 
     pub fn gas_of_book_order(
         &self,
-        order: &GroupedVanillaOrder
+        order: &OrderWithStorageData<GroupedVanillaOrder>
     ) -> Result<GasUsed, GasSimulationError> {
         self.execute_on_revm(&HashMap::default(), |execution_env| {
+            execution_env.env.tx.data = 
             // execution_env.env.
         })
     }

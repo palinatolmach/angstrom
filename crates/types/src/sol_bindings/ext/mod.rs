@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::orders::OrderLocation;
 
+pub mod order_ext;
 pub mod contract_bundle_ext;
 pub mod grouped_orders;
 pub mod top_of_block_ext;
@@ -44,6 +45,15 @@ pub trait RawPoolOrder: fmt::Debug + Send + Sync + Clone + Unpin + 'static {
     fn is_valid_signature(&self) -> bool;
 
     fn order_location(&self) -> OrderLocation;
+}
+
+/// allows us to flip a order. This is useful for when we need to do gas
+/// simulation as we will want to be able to simulate a order completely against
+/// itself.
+pub trait FlipOrder {
+    fn flip_order(&self) -> Self
+    where
+        Self: Sized;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, Copy)]
