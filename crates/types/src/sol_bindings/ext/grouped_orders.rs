@@ -57,8 +57,8 @@ pub enum FlashVariants {
     Partial(PartialFlashOrder),
     Exact(ExactFlashOrder)
 }
-impl FlipOrder for FlashVariants{
-    fn flip_order(&self) -> FlashVariants{
+impl FlipOrder for FlashVariants {
+    fn flip_order(&self) -> FlashVariants {
         match self {
             FlashVariants::Partial(p) => p.flip_order(),
             FlashVariants::Exact(p) => p.flip_order()
@@ -566,6 +566,7 @@ impl RawPoolOrder for TopOfBlockOrder {
         OrderLocation::Searcher
     }
 }
+
 impl RawPoolOrder for PartialStandingOrder {
     fn is_valid_signature(&self) -> bool {
         let Ok(sig) = Signature::new_from_bytes(&self.meta.signature) else { return false };
@@ -584,7 +585,12 @@ impl RawPoolOrder for PartialStandingOrder {
     }
 
     fn amount_out_min(&self) -> u128 {
-        self.amountFilled
+        // TODO: verify math on this. feels wrong
+        if self.assetIn < self.assetOut {
+            self.minAmountIn * self.minPrice.to::<u128>()
+        } else {
+            self.minAmountIn / self.minPrice.to::<u128>()
+        }
     }
 
     fn limit_price(&self) -> U256 {
@@ -638,8 +644,12 @@ impl RawPoolOrder for ExactStandingOrder {
     }
 
     fn amount_out_min(&self) -> u128 {
-        todo!();
-        // self.amount * self.minPrice.to::<u128>()
+        // TODO: verify math on this. feels wrong
+        if self.assetIn < self.assetOut {
+            self.amount * self.minPrice.to::<u128>()
+        } else {
+            self.amount / self.minPrice.to::<u128>()
+        }
     }
 
     fn limit_price(&self) -> U256 {
@@ -647,8 +657,7 @@ impl RawPoolOrder for ExactStandingOrder {
     }
 
     fn amount_in(&self) -> u128 {
-        todo!();
-        // self.amount
+        self.amount
     }
 
     fn deadline(&self) -> Option<U256> {
@@ -710,7 +719,12 @@ impl RawPoolOrder for PartialFlashOrder {
     }
 
     fn amount_out_min(&self) -> u128 {
-        self.minPrice.to::<u128>() * self.minAmountIn
+        // TODO: verify math on this. feels wrong
+        if self.assetIn < self.assetOut {
+            self.minAmountIn * self.minPrice.to::<u128>()
+        } else {
+            self.minAmountIn / self.minPrice.to::<u128>()
+        }
     }
 
     fn respend_avoidance_strategy(&self) -> RespendAvoidanceMethod {
@@ -772,7 +786,12 @@ impl RawPoolOrder for ExactFlashOrder {
     }
 
     fn amount_out_min(&self) -> u128 {
-        self.minPrice.to::<u128>() * self.amount
+        // TODO: verify math on this. feels wrong
+        if self.assetIn < self.assetOut {
+            self.amount * self.minPrice.to::<u128>()
+        } else {
+            self.amount / self.minPrice.to::<u128>()
+        }
     }
 
     fn respend_avoidance_strategy(&self) -> RespendAvoidanceMethod {
