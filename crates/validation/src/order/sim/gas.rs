@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::{Anvil, AnvilInstance},
-    primitives::Address,
+    primitives::{Address, U256},
     providers::{
         builder,
         fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
@@ -13,11 +13,14 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::{SolCall, SolValue}
 };
-use angstrom_types::sol_bindings::{
-    grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
-    rpc_orders::TopOfBlockOrder
+use angstrom_types::{
+    contract_bindings::angstrom::Angstrom::Overflow,
+    sol_bindings::{
+        grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
+        rpc_orders::TopOfBlockOrder
+    }
 };
-use reth_primitives::{transaction::FillTxEnv, TxKind};
+use reth_primitives::{keccak256, transaction::FillTxEnv, TxKind};
 use revm::{
     db::{CacheDB, WrapDatabaseRef},
     handler::register::EvmHandler,
@@ -42,21 +45,24 @@ const DEFAULT_FROM: Address =
 /// the shared gas by using the simple formula:
 /// (Bundle execution cost - Sum(Orders Gas payed)) / len(Orders)
 pub struct OrderGasCalculations<DB> {
-    db:               Arc<RevmLRU<DB>>,
-    angstrom_address: Option<Address>
+    db:               CacheDB<Arc<RevmLRU<DB>>>,
+    // the deployed addresses in cache_db
+    angstrom_address: Address,
+    uniswap_address:  Address
 }
 
 impl<DB> OrderGasCalculations<DB>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static
 {
-    /// if there isn't a address. OrderGasCalculations will spin up a mock env
-    /// with revm.
-    pub fn new(db: Arc<RevmLRU<DB>>, angstrom_address: Option<Address>) -> Self {
-        Self { db, angstrom_address }
+    pub fn new(db: Arc<RevmLRU<DB>>) -> eyre::Result<Self> {
+        let ConfiguredRevm { db, uni_swap, angstrom } =
+            Self::setup_revm_cache_database_for_simulation(db)?;
+
+        Ok(Self { db, uniswap_address: uni_swap, angstrom_address: angstrom })
     }
 
-    fn execute_with_db<D: DatabaseRef, F>(&self, db: D, f: F) -> (ResultAndState, D)
+    fn execute_with_db<D: DatabaseRef, F>(db: D, f: F) -> (ResultAndState, D)
     where
         F: FnOnce(&mut TxEnv)
     {
@@ -71,15 +77,18 @@ where
             })
             .modify_tx_env(f)
             .build();
+
         let out = revm_sim.transact()?;
         let cache_db = revm_sim.into_context().evm.db.0;
         (out, cache_db)
     }
 
-    fn setup_revm_cache_database_for_simulation(&self) -> eyre::Result<ConfiguredRevm<DB>> {
-        let mut cache_db = CacheDB::new(self.db.clone());
+    fn setup_revm_cache_database_for_simulation<DB>(
+        db: Arc<RevmLRU<DB>>
+    ) -> eyre::Result<ConfiguredRevm<DB>> {
+        let mut cache_db = CacheDB::new(db.clone());
 
-        let (out, cache_db) = self.execute_with_db(cache_db, |tx| {
+        let (out, cache_db) = Self::execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Create;
             tx.caller = DEFAULT_FROM;
             tx.data = angstrom_types::contract_bindings::poolmanager::PoolManager::BYTECODE;
@@ -114,7 +123,7 @@ where
         let angstrom_address = Address::from_slice(&*out.result.output().unwrap());
 
         // enable default from to call the angstrom contract.
-        let (out, cache_db) = self.execute_with_db(cache_db, |tx| {
+        let (out, mut cache_db) = self.execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Call(angstrom_address);
             tx.caller = DEFAULT_FROM;
             tx.data =
@@ -130,11 +139,41 @@ where
         if !out.result.is_success() {
             eyre::bail!("failed to set default from address as node on angstrom");
         }
+        Ok(ConfiguredRevm { db: cache_db, angstrom: angstrom_address, uni_swap: v4_address })
+    }
+
+    fn fetch_db_with_overrides(
+        &self,
+        overrides: OverridesForTestAngstrom
+    ) -> eyre::Result<CacheDB<DB>> {
+        // fork db
+        let cache_db = self.db.clone();
+
+        // change approval of token in and then balance of token out
+        let OverridesForTestAngstrom { user_address, amount_in, amount_out, token_in, token_out } =
+            overrides;
+        // for the first 10 slots, we just force override everything to balance. because
+        // of the way storage slots work in solidity. this shouldn't effect
+        // anything
+        for i in 0..10 {
+            let balance_amount_out_slot = keccak256((angstrom_address, i).abi_encode());
+
+            //keccak256(angstrom . keccak256(user . idx)))
+            let approval_slot = keccak256(
+                (angstrom_address, keccak256((user_address, i).abi_encode())).abi_encode()
+            );
+
+            cache_db.insert_account_storage(token_out, balance_amount_out_slot, amount_out)?;
+            cache_db.insert_account_storage(token_in, approval_slot, amount_in)?;
+        }
+
+        Ok(cache_db)
     }
 
     fn execute_on_revm<F>(
         &self,
         offsets: &HashMap<usize, usize>,
+        overrides: OverridesForTestAngstrom,
         f: F
     ) -> Result<GasUsed, GasSimulationError>
     where
@@ -144,13 +183,10 @@ where
         let mut evm_handler = EnvWithHandlerCfg::default();
 
         f(&mut evm_handler);
-
         let account_info = cache_db.insert_contract(account);
 
-        // TODO: going to get rid of revm lru so this is why using cache_db here
-
         let mut evm = revm::Evm::builder()
-            .with_ref_db(self.db.clone())
+            .with_ref_db(self.fetch_db_with_overrides(overrides)?)
             .with_external_context(&mut inspector)
             .with_env_with_handler_cfg(evm_handler)
             .append_handler_register(inspector_handle_register)
@@ -202,7 +238,15 @@ pub enum GasSimulationError {
 }
 
 struct ConfiguredRevm<DB> {
-    pub uniswap:  Address,
+    pub uni_swap: Address,
     pub angstrom: Address,
     pub db:       CacheDB<RevmLRU<DB>>
+}
+
+struct OverridesForTestAngstrom {
+    pub user_address: Address,
+    pub amount_in:    U256,
+    pub amount_out:   U256,
+    pub token_in:     U256,
+    pub token_out:    U256
 }
