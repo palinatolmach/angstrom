@@ -1,4 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
+use reth_errors::RethError;
 
 use alloy::{
     network::{Ethereum, EthereumWallet},
@@ -22,11 +23,11 @@ use angstrom_types::{
         RawPoolOrder
     }
 };
-use pade::Encode;
+use pade::PadeEncode;
 use reth_primitives::{keccak256, transaction::FillTxEnv, TxKind};
 use revm::{
     db::{CacheDB, WrapDatabaseRef},
-    handler::register::EvmHandler,
+    handler::register::{EvmHandler, HandleRegister},
     inspector_handle_register,
     interpreter::Gas,
     primitives::{AccountInfo, EnvWithHandlerCfg, ResultAndState, TxEnv},
@@ -56,7 +57,11 @@ pub struct OrderGasCalculations<DB> {
 
 impl<DB> OrderGasCalculations<DB>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+    DB: BlockStateProviderFactory
+        + Unpin
+        + Clone
+        + 'static
+        + revm::DatabaseRef<Error = EVMError<RethError>>
 {
     pub fn new(db: Arc<RevmLRU<DB>>) -> eyre::Result<Self> {
         let ConfiguredRevm { db, uni_swap, angstrom } =
@@ -87,12 +92,12 @@ where
                 tx.caller = from;
                 tx.transact_to = TxKind::Call(self.angstrom_address);
                 tx.data = angstrom_types::contract_bindings::angstrom::Angstrom::executeCall::new(
-                    (bundle)
+                    (bundle.into(),)
                 )
                 .abi_encode()
                 .into();
                 tx.value = U256::from(0);
-                tx.nonce = 1;
+                tx.nonce = None;
             }
         )
     }
@@ -124,7 +129,7 @@ where
                 .abi_encode()
                 .into();
                 tx.value = U256::from(0);
-                tx.nonce = 1;
+                tx.nonce = None;
             }
         )
     }
@@ -137,7 +142,6 @@ where
         let mut revm_sim = revm::Evm::builder()
             .with_ref_db(db)
             .with_env_with_handler_cfg(evm_handler)
-            .append_handler_register(inspector_handle_register)
             .modify_env(|env| {
                 env.cfg.disable_balance_check = true;
                 env.cfg.disable_block_gas_limit = true;
@@ -160,7 +164,7 @@ where
         let (out, cache_db) = Self::execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Create;
             tx.caller = DEFAULT_FROM;
-            tx.data = angstrom_types::contract_bindings::poolmanager::PoolManager::BYTECODE;
+            tx.data = angstrom_types::contract_bindings::poolmanager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
         });
 
@@ -172,7 +176,7 @@ where
         // deploy angstrom.
 
         let mut angstrom_raw_bytecode =
-            angstrom_types::contract_bindings::angstrom::Angstrom::BYTECODE;
+            angstrom_types::contract_bindings::angstrom::Angstrom::BYTECODE.clone();
 
         // in solidity when deploying. constructor args are appended to the end of the
         // bytecode.
@@ -215,7 +219,7 @@ where
         overrides: OverridesForTestAngstrom
     ) -> eyre::Result<CacheDB<Arc<RevmLRU<DB>>>> {
         // fork db
-        let cache_db = self.db.clone();
+        let mut cache_db = self.db.clone();
 
         // change approval of token in and then balance of token out
         let OverridesForTestAngstrom { user_address, amount_in, amount_out, token_in, token_out } =
@@ -232,8 +236,12 @@ where
                 (self.angstrom_address, keccak256((user_address, i).abi_encode())).abi_encode()
             );
 
-            cache_db.insert_account_storage(token_out, balance_amount_out_slot, amount_out)?;
-            cache_db.insert_account_storage(token_in, approval_slot, amount_in)?;
+            cache_db.insert_account_storage(
+                token_out,
+                balance_amount_out_slot.into(),
+                amount_out
+            )?;
+            cache_db.insert_account_storage(token_in, approval_slot.into(), amount_in)?;
         }
 
         Ok(cache_db)
@@ -279,7 +287,7 @@ where
 #[derive(Debug, thiserror::Error)]
 pub enum GasSimulationError<DB>
 where
-    DB: revm::DatabaseRef
+    DB: revm::DatabaseRef<Error = EVMError<RethError>>
 {
     #[error("Transaction Reverted")]
     TransactionReverted,
