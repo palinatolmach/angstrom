@@ -32,6 +32,7 @@ use crate::{BlockStateProviderFactory, RevmLRU};
 
 const DEFAULT_FROM: Address =
     alloy::primitives::address!("aa250d5630b4cf539739df2c5dacb4c659f2488d");
+
 /// deals with the calculation of gas for a given type of order.
 /// user orders and tob orders take different paths and are different size and
 /// as such, pay different amount of gas in order to execute.
@@ -39,17 +40,19 @@ const DEFAULT_FROM: Address =
 /// specific PC offsets of the code we want the user to pay for specifically.
 /// Once the bundle has been built. We simulate the bundle and then calculate
 /// the shared gas by using the simple formula:
-/// (Bundl e execution cost - Sum(Orders Gas payed)) / len(Orders)
+/// (Bundle execution cost - Sum(Orders Gas payed)) / len(Orders)
 pub struct OrderGasCalculations<DB> {
     db:               Arc<RevmLRU<DB>>,
-    angstrom_address: Address
+    angstrom_address: Option<Address>
 }
 
 impl<DB> OrderGasCalculations<DB>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static
 {
-    pub fn new(db: Arc<RevmLRU<DB>>, angstrom_address: Address) -> Self {
+    /// if there isn't a address. OrderGasCalculations will spin up a mock env
+    /// with revm.
+    pub fn new(db: Arc<RevmLRU<DB>>, angstrom_address: Option<Address>) -> Self {
         Self { db, angstrom_address }
     }
 
@@ -73,7 +76,7 @@ where
         (out, cache_db)
     }
 
-    fn setup_revm_cache_database_for_simulation(&self) -> eyre::Result<CacheDB<RevmLRU<DB>>> {
+    fn setup_revm_cache_database_for_simulation(&self) -> eyre::Result<ConfiguredRevm<DB>> {
         let mut cache_db = CacheDB::new(self.db.clone());
 
         let (out, cache_db) = self.execute_with_db(cache_db, |tx| {
@@ -92,9 +95,9 @@ where
 
         let mut angstrom_raw_bytecode =
             angstrom_types::contract_bindings::angstrom::Angstrom::BYTECODE;
+
         // in solidity when deploying. constructor args are appended to the end of the
         // bytecode.
-        //
         let constructor_args = (v4_address, DEFAULT_FROM, DEFAULT_FROM).abi_encode().into();
         let data = [angstrom_raw_bytecode, constructor_args].concat();
 
@@ -110,6 +113,7 @@ where
         }
         let angstrom_address = Address::from_slice(&*out.result.output().unwrap());
 
+        // enable default from to call the angstrom contract.
         let (out, cache_db) = self.execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Call(angstrom_address);
             tx.caller = DEFAULT_FROM;
@@ -119,6 +123,7 @@ where
                 ])
                 .abi_encode()
                 .into();
+
             tx.value = U256::from(0);
         });
 
@@ -194,4 +199,10 @@ where
 pub enum GasSimulationError {
     #[error("Transaction Reverted")]
     TransactionReverted
+}
+
+struct ConfiguredRevm<DB> {
+    pub uniswap:  Address,
+    pub angstrom: Address,
+    pub db:       CacheDB<RevmLRU<DB>>
 }
