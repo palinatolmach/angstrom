@@ -155,6 +155,7 @@ where
         // for the first 10 slots, we just force override everything to balance. because
         // of the way storage slots work in solidity. this shouldn't effect
         // anything
+        // https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
         for i in 0..10 {
             let balance_amount_out_slot = keccak256((angstrom_address, i).abi_encode());
 
