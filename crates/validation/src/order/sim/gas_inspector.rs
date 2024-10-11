@@ -80,9 +80,6 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
             let start_pc = self.in_flight.take().unwrap();
             let start_gas = self.in_flight_start_gas.take().unwrap();
 
-            // ensure we only measure once.
-            self.measurement_ranges.remove(&start_pc);
-
             let end_gas = interp.gas().spent();
             let gas_used = end_gas - start_gas;
             self.results.insert((start_pc, pc), gas_used);

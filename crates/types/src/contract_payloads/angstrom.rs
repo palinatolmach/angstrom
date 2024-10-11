@@ -157,7 +157,7 @@ impl AngstromBundle {
     }
 
     pub fn build_dummy_for_tob_gas(
-        user_order: OrderWithStorageData<RpcTopOfBlockOrder>
+        user_order: &OrderWithStorageData<RpcTopOfBlockOrder>
     ) -> eyre::Result<Self> {
         let mut top_of_block_orders = Vec::new();
         let mut pool_updates = Vec::new();
@@ -167,7 +167,7 @@ impl AngstromBundle {
 
         // Get the information for the pool or skip this solution if we can't find a
         // pool for it
-        let Some((t0, t1)) = {
+        let (t0, t1) = {
             let token_in = user_order.token_in();
             let token_out = user_order.token_out();
             if token_in < token_out {
@@ -178,8 +178,8 @@ impl AngstromBundle {
         };
         // Make sure the involved assets are in our assets array and we have the
         // appropriate asset index for them
-        let t0_idx = asset_builder.add_or_get_asset(*t0) as u16;
-        let t1_idx = asset_builder.add_or_get_asset(*t1) as u16;
+        let t0_idx = asset_builder.add_or_get_asset(t0) as u16;
+        let t1_idx = asset_builder.add_or_get_asset(t1) as u16;
 
         // TODO this wasn't done when pulled from davids branch.
         let pair_idx = pairs.len() - 1;
@@ -201,7 +201,7 @@ impl AngstromBundle {
     }
 
     pub fn build_dummy_for_user_gas(
-        user_order: OrderWithStorageData<GroupedVanillaOrder>
+        user_order: &OrderWithStorageData<GroupedVanillaOrder>
     ) -> eyre::Result<Self> {
         let mut top_of_block_orders = Vec::new();
         let mut pool_updates = Vec::new();
@@ -211,7 +211,7 @@ impl AngstromBundle {
 
         // Get the information for the pool or skip this solution if we can't find a
         // pool for it
-        let Some((t0, t1)) = {
+        let (t0, t1) = {
             let token_in = user_order.token_in();
             let token_out = user_order.token_out();
             if token_in < token_out {
@@ -222,8 +222,8 @@ impl AngstromBundle {
         };
         // Make sure the involved assets are in our assets array and we have the
         // appropriate asset index for them
-        let t0_idx = asset_builder.add_or_get_asset(*t0) as u16;
-        let t1_idx = asset_builder.add_or_get_asset(*t1) as u16;
+        let t0_idx = asset_builder.add_or_get_asset(t0) as u16;
+        let t1_idx = asset_builder.add_or_get_asset(t1) as u16;
 
         // TODO this wasn't done when pulled from davids branch.
         let pair_idx = pairs.len() - 1;

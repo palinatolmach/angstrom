@@ -11013,6 +11013,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex-literal",
+ "pade",
  "parking_lot 0.12.3",
  "pin-project",
  "rand",

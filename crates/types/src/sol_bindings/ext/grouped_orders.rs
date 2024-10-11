@@ -4,7 +4,7 @@ use alloy::primitives::{Address, Bytes, FixedBytes, TxHash, U256};
 use reth_primitives::B256;
 use serde::{Deserialize, Serialize};
 
-use super::{FlipOrder, RawPoolOrder, RespendAvoidanceMethod};
+use super::{RawPoolOrder, RespendAvoidanceMethod};
 use crate::{
     matching::Ray,
     orders::{OrderId, OrderLocation, OrderPriorityData},
@@ -27,14 +27,6 @@ pub enum StandingVariants {
     Partial(PartialStandingOrder),
     Exact(ExactStandingOrder)
 }
-impl FlipOrder for StandingVariants {
-    fn flip_order(&self) -> StandingVariants {
-        match self {
-            StandingVariants::Partial(p) => p.flip_order(),
-            StandingVariants::Exact(p) => p.flip_order()
-        }
-    }
-}
 
 impl StandingVariants {
     pub fn signature(&self) -> &Bytes {
@@ -56,14 +48,6 @@ impl StandingVariants {
 pub enum FlashVariants {
     Partial(PartialFlashOrder),
     Exact(ExactFlashOrder)
-}
-impl FlipOrder for FlashVariants {
-    fn flip_order(&self) -> FlashVariants {
-        match self {
-            FlashVariants::Partial(p) => p.flip_order(),
-            FlashVariants::Exact(p) => p.flip_order()
-        }
-    }
 }
 
 impl FlashVariants {
@@ -157,22 +141,6 @@ pub struct OrderWithStorageData<Order> {
     pub valid_block:        u64,
     /// holds expiry data
     pub order_id:           OrderId
-}
-
-impl<O: FlipOrder> FlipOrder for OrderWithStorageData<O> {
-    fn flip_order(&self) -> OrderWithStorageData<O> {
-        OrderWithStorageData {
-            order:              self.order.flip_order(),
-            order_id:           self.order_id,
-            valid_block:        self.valid_block,
-            is_bid:             !self.is_bid,
-            pool_id:            self.pool_id,
-            is_valid:           self.is_valid,
-            invalidates:        self.invalidates,
-            priority_data:      self.priority_data,
-            is_currently_valid: self.is_currently_valid
-        }
-    }
 }
 
 impl<Order> Hash for OrderWithStorageData<Order> {
@@ -420,15 +388,6 @@ impl RawPoolOrder for FlashVariants {
 pub enum GroupedVanillaOrder {
     Standing(StandingVariants),
     KillOrFill(FlashVariants)
-}
-
-impl FlipOrder for GroupedVanillaOrder {
-    fn flip_order(&self) -> GroupedVanillaOrder {
-        match self {
-            GroupedVanillaOrder::Standing(p) => p.flip_order(),
-            GroupedVanillaOrder::KillOrFill(p) => p.flip_order()
-        }
-    }
 }
 
 impl GroupedVanillaOrder {
