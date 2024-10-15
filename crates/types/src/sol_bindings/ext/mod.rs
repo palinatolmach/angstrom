@@ -46,7 +46,6 @@ pub trait RawPoolOrder: fmt::Debug + Send + Sync + Clone + Unpin + 'static {
     fn order_location(&self) -> OrderLocation;
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, Copy)]
 pub enum RespendAvoidanceMethod {
     Nonce(u64),

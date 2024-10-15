@@ -1,5 +1,4 @@
 use std::{collections::HashMap, sync::Arc};
-use reth_errors::RethError;
 
 use alloy::{
     network::{Ethereum, EthereumWallet},
@@ -23,7 +22,9 @@ use angstrom_types::{
         RawPoolOrder
     }
 };
+use eyre::eyre;
 use pade::PadeEncode;
+use reth_errors::RethError;
 use reth_primitives::{keccak256, transaction::FillTxEnv, TxKind};
 use revm::{
     db::{CacheDB, WrapDatabaseRef},
@@ -37,6 +38,7 @@ use revm::{
 use super::gas_inspector::{GasSimulationInspector, GasUsed};
 use crate::{BlockStateProviderFactory, RevmLRU};
 
+/// A address we can use to deploy contracts
 const DEFAULT_FROM: Address =
     alloy::primitives::address!("aa250d5630b4cf539739df2c5dacb4c659f2488d");
 
@@ -57,11 +59,8 @@ pub struct OrderGasCalculations<DB> {
 
 impl<DB> OrderGasCalculations<DB>
 where
-    DB: BlockStateProviderFactory
-        + Unpin
-        + Clone
-        + 'static
-        + revm::DatabaseRef<Error = EVMError<RethError>>
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync
 {
     pub fn new(db: Arc<RevmLRU<DB>>) -> eyre::Result<Self> {
         let ConfiguredRevm { db, uni_swap, angstrom } =
@@ -73,15 +72,15 @@ where
     pub fn gas_of_tob_order(
         &self,
         tob: &OrderWithStorageData<TopOfBlockOrder>
-    ) -> Result<GasUsed, GasSimulationError<DB>> {
+    ) -> eyre::Result<GasUsed> {
         self.execute_on_revm(
             &HashMap::default(),
             OverridesForTestAngstrom {
-                amount_in:    order.amount_in(),
-                amount_out:   order.amount_out_min(),
-                token_out:    order.token_out(),
-                token_in:     order.token_in(),
-                user_address: order.from()
+                amount_in:    U256::from(tob.amount_in()),
+                amount_out:   U256::from(tob.amount_out_min()),
+                token_out:    tob.token_out(),
+                token_in:     tob.token_in(),
+                user_address: tob.from()
             },
             |execution_env| {
                 let bundle = AngstromBundle::build_dummy_for_tob_gas(tob)
@@ -89,7 +88,7 @@ where
                     .pade_encode();
 
                 let tx = &mut execution_env.tx;
-                tx.caller = from;
+                tx.caller = DEFAULT_FROM;
                 tx.transact_to = TxKind::Call(self.angstrom_address);
                 tx.data = angstrom_types::contract_bindings::angstrom::Angstrom::executeCall::new(
                     (bundle.into(),)
@@ -105,12 +104,12 @@ where
     pub fn gas_of_book_order(
         &self,
         order: &OrderWithStorageData<GroupedVanillaOrder>
-    ) -> Result<GasUsed, GasSimulationError<DB>> {
+    ) -> eyre::Result<GasUsed> {
         self.execute_on_revm(
             &HashMap::default(),
             OverridesForTestAngstrom {
-                amount_in:    order.amount_in(),
-                amount_out:   order.amount_out_min(),
+                amount_in:    U256::from(order.amount_in()),
+                amount_out:   U256::from(order.amount_out_min()),
                 token_out:    order.token_out(),
                 token_in:     order.token_in(),
                 user_address: order.from()
@@ -121,10 +120,10 @@ where
                     .pade_encode();
 
                 let tx = &mut execution_env.tx;
-                tx.caller = from;
+                tx.caller = DEFAULT_FROM;
                 tx.transact_to = TxKind::Call(self.angstrom_address);
                 tx.data = angstrom_types::contract_bindings::angstrom::Angstrom::executeCall::new(
-                    (bundle)
+                    (bundle.into(),)
                 )
                 .abi_encode()
                 .into();
@@ -134,9 +133,10 @@ where
         )
     }
 
-    fn execute_with_db<D: DatabaseRef, F>(db: D, f: F) -> (ResultAndState, D)
+    fn execute_with_db<D: DatabaseRef, F>(db: D, f: F) -> eyre::Result<(ResultAndState, D)>
     where
-        F: FnOnce(&mut TxEnv)
+        F: FnOnce(&mut TxEnv),
+        <D as revm::DatabaseRef>::Error: Send + Sync
     {
         let evm_handler = EnvWithHandlerCfg::default();
         let mut revm_sim = revm::Evm::builder()
@@ -149,9 +149,11 @@ where
             .modify_tx_env(f)
             .build();
 
-        let out = revm_sim.transact()?;
-        let cache_db = revm_sim.into_context().evm.db.0;
-        (out, cache_db)
+        let Ok(out) = revm_sim.transact() else {
+            return Err(eyre!("failed to transact transaction"))
+        };
+        let (cache_db, _) = revm_sim.into_db_and_env_with_handler_cfg();
+        Ok((out, cache_db.0))
     }
 
     /// deploys angstrom + univ4 and then sets DEFAULT_FROM address as a node in
@@ -166,7 +168,7 @@ where
             tx.caller = DEFAULT_FROM;
             tx.data = angstrom_types::contract_bindings::poolmanager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
-        });
+        })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to deploy uniswap v4 pool manager");
@@ -188,7 +190,7 @@ where
             tx.caller = DEFAULT_FROM;
             tx.data = data.into();
             tx.value = U256::from(0);
-        });
+        })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to deploy angstrom");
@@ -206,7 +208,7 @@ where
             .into();
 
             tx.value = U256::from(0);
-        });
+        })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to set default from address as node on angstrom");
@@ -252,7 +254,7 @@ where
         offsets: &HashMap<usize, usize>,
         overrides: OverridesForTestAngstrom,
         f: F
-    ) -> Result<GasUsed, GasSimulationError<DB>>
+    ) -> eyre::Result<GasUsed>
     where
         F: FnOnce(&mut EnvWithHandlerCfg)
     {
@@ -261,40 +263,29 @@ where
 
         f(&mut evm_handler);
 
-        let mut evm = revm::Evm::builder()
-            .with_ref_db(self.fetch_db_with_overrides(overrides)?)
-            .with_external_context(&mut inspector)
-            .with_env_with_handler_cfg(evm_handler)
-            .append_handler_register(inspector_handle_register)
-            .modify_env(|env| {
-                env.cfg.disable_balance_check = true;
-            })
-            .build();
+        {
+            let mut evm = revm::Evm::builder()
+                .with_ref_db(self.fetch_db_with_overrides(overrides)?)
+                .with_external_context(&mut inspector)
+                .with_env_with_handler_cfg(evm_handler)
+                .append_handler_register(inspector_handle_register)
+                .modify_env(|env| {
+                    env.cfg.disable_balance_check = true;
+                })
+                .build();
 
-        let result = evm.transact()?;
+            let result = evm.transact()?;
 
-        if !result.result.is_success() {
-            return Err(eyre::eyre!(
-                "gas simulation had a revert. cannot guarantee the proper gas was estimated"
-            )
-            .into())
+            if !result.result.is_success() {
+                return Err(eyre::eyre!(
+                    "gas simulation had a revert. cannot guarantee the proper gas was estimated"
+                )
+                .into())
+            }
         }
 
         Ok(inspector.into_gas_used())
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum GasSimulationError<DB>
-where
-    DB: revm::DatabaseRef<Error = EVMError<RethError>>
-{
-    #[error("Transaction Reverted")]
-    TransactionReverted,
-    #[error(transparent)]
-    Eyre(#[from] eyre::Error),
-    #[error(transparent)]
-    Revm(#[from] DB::Error)
 }
 
 struct ConfiguredRevm<DB> {
