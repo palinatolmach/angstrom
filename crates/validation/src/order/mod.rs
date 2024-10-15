@@ -11,11 +11,13 @@ use angstrom_types::{
         rpc_orders::TopOfBlockOrder
     }
 };
+use angstrom_utils::GenericExt;
 use reth_primitives::B256;
+use sim::SimValidation;
 use state::account::user::UserAddress;
 use tokio::sync::oneshot::{channel, Sender};
-
-use crate::validator::ValidationRequest;
+use crate::BlockStateProviderFactory;
+use crate::{validator::ValidationRequest, BlockStateProviderFactory};
 
 pub mod order_validator;
 pub mod sim;
@@ -79,6 +81,45 @@ pub enum OrderValidationResults {
     // the raw hash to be removed
     Invalid(B256),
     TransitionedToBlock
+}
+
+impl OrderValidationResults {
+    pub fn add_gas_cost_or_invalidate<DB>(&mut self, sim: &SimValidation<DB>, is_limit: bool)
+    where
+        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+    {
+        if let Self::Valid(order) = self {
+            if is_limit {
+                let mut order = order
+                    .try_map_inner(|order| match order {
+                        AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
+                        AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
+                        _ => unreachable!()
+                    })
+                    .unwrap();
+
+                if let Ok(gas_used) = sim.calculate_user_gas(&order) {
+                    order.priority_data.gas += gas_used as u128;
+                } else {
+                    let order_hash = order.order_hash();
+                    *self = OrderValidationResults::Invalid(order_hash);
+                }
+            } else {
+                let mut order = order
+                    .try_map_inner(|order| match order {
+                        AllOrders::TOB(s) => Ok(s),
+                        _ => unreachable!()
+                    })
+                    .unwrap();
+                if let Ok(gas_used) = sim.calculate_tob_gas(&order) {
+                    order.priority_data.gas += gas_used as u128;
+                } else {
+                    let order_hash = order.order_hash();
+                    *self = OrderValidationResults::Invalid(order_hash);
+                }
+            }
+        }
+    }
 }
 
 pub enum OrderValidation {

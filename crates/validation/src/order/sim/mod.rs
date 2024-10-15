@@ -1,6 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use alloy::primitives::{Address, U256};
+use angstrom_types::sol_bindings::{
+    grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
+    rpc_orders::TopOfBlockOrder
+};
+use gas::OrderGasCalculations;
+use gas_inspector::GasUsed;
 
 use super::OrderValidationRequest;
 use crate::common::lru_db::{BlockStateProviderFactory, RevmLRU};
@@ -8,18 +14,35 @@ use crate::common::lru_db::{BlockStateProviderFactory, RevmLRU};
 mod gas;
 mod gas_inspector;
 
-/// sims the pre and post hook assuming
+/// validation relating to simulations.
 #[derive(Clone)]
 pub struct SimValidation<DB> {
-    db: Arc<RevmLRU<DB>>
+    db:             Arc<RevmLRU<DB>>,
+    gas_calculator: OrderGasCalculations<DB>
 }
 
 impl<DB> SimValidation<DB>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
 {
     pub fn new(db: Arc<RevmLRU<DB>>) -> Self {
-        Self { db }
+        let gas_calculator = OrderGasCalculations::new(db.clone())
+            .expect("failed to deploy baseline angstrom for gas calculations");
+        Self { db, gas_calculator }
+    }
+
+    pub fn calculate_tob_gas(
+        &self,
+        order: &OrderWithStorageData<TopOfBlockOrder>
+    ) -> eyre::Result<GasUsed> {
+        self.gas_calculator.gas_of_tob_order(order)
+    }
+
+    pub fn calculate_user_gas(
+        &self,
+        order: &OrderWithStorageData<GroupedVanillaOrder>
+    ) -> eyre::Result<GasUsed> {
+        self.gas_calculator.gas_of_book_order(order)
     }
 
     pub fn validate_hook(

@@ -54,7 +54,7 @@ impl<Pools: PoolsTracker, Fetch: StateFetchUtils> StateValidation<Pools, Fetch> 
             .prepare_for_new_block(address_changes, completed_orders)
     }
 
-    fn handle_regular_order<O: RawPoolOrder + Into<AllOrders>>(
+    pub fn handle_regular_order<O: RawPoolOrder + Into<AllOrders>>(
         &self,
         order: O,
         block: u64,

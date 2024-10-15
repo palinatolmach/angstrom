@@ -32,7 +32,7 @@ pub struct OrderValidator<DB, Pools, Fetch> {
 
 impl<DB, Pools, Fetch> OrderValidator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static,
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
     Pools: PoolsTracker + Sync + 'static,
     Fetch: StateFetchUtils + Sync + 'static
 {
@@ -75,11 +75,26 @@ where
         let order_validation: OrderValidation = order.into();
         let user = order_validation.user();
         let cloned_state = self.state.clone();
+        let cloned_sim = self.sim.clone();
 
         self.thread_pool.add_new_task(
             user,
             Box::pin(async move {
-                cloned_state.validate_state_of_regular_order(order_validation, block_number)
+                match order {
+                    OrderValidation::Limit(tx, order, origin) => {
+                        let mut results = cloned_state.handle_regular_order(order, block, true);
+                        results.add_gas_cost_or_invalidate(&cloned_sim);
+
+                        let _ = tx.send(results);
+                    }
+                    OrderValidation::Searcher(tx, order, origin) => {
+                        let results = cloned_state.handle_regular_order(order, block, false);
+                        results.add_gas_cost_or_invalidate(&cloned_sim);
+
+                        let _ = tx.send(results);
+                    }
+                    _ => unreachable!()
+                }
             })
         );
     }
