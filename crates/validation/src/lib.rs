@@ -35,7 +35,9 @@ use crate::{
 
 pub const TOKEN_CONFIG_FILE: &str = "./crates/validation/state_config.toml";
 
-pub fn init_validation<DB: BlockStateProviderFactory + Unpin + Clone + 'static>(
+pub fn init_validation<
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+>(
     db: DB,
     cache_max_bytes: usize
 ) -> ValidationClient {
@@ -69,7 +71,7 @@ pub fn init_validation<DB: BlockStateProviderFactory + Unpin + Clone + 'static>(
 }
 
 pub fn init_validation_tests<
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static,
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
     State: StateFetchUtils + Sync + 'static,
     Pool: PoolsTracker + Sync + 'static
 >(

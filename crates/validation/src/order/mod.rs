@@ -16,7 +16,7 @@ use reth_primitives::B256;
 use sim::SimValidation;
 use state::account::user::UserAddress;
 use tokio::sync::oneshot::{channel, Sender};
-use crate::BlockStateProviderFactory;
+
 use crate::{validator::ValidationRequest, BlockStateProviderFactory};
 
 pub mod order_validator;
