@@ -35,6 +35,7 @@ where
         &self,
         order: &OrderWithStorageData<TopOfBlockOrder>
     ) -> eyre::Result<GasUsed> {
+        // TODO: will do this in next pr but should have the conversion to ERC-20 here
         self.gas_calculator.gas_of_tob_order(order)
     }
 
@@ -42,6 +43,7 @@ where
         &self,
         order: &OrderWithStorageData<GroupedVanillaOrder>
     ) -> eyre::Result<GasUsed> {
+        // TODO: will do this in next pr but should have the conversion to ERC-20 here
         self.gas_calculator.gas_of_book_order(order)
     }
 

@@ -96,24 +96,14 @@ impl OrderValidationResults {
                 let res = Self::map_and_process(
                     order,
                     sim,
-                    |order| {
-                        order
-                            .try_map_inner(|order| match order {
-                                AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
-                                AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
-                                _ => unreachable!()
-                            })
-                            .unwrap()
+                    |order| match order {
+                        AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
+                        AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
+                        _ => unreachable!()
                     },
-                    |order| {
-                        order
-                            .try_map_inner(|order| {
-                                Ok(match order {
-                                    GroupedVanillaOrder::Standing(s) => AllOrders::Standing(s),
-                                    GroupedVanillaOrder::KillOrFill(s) => AllOrders::Flash(s)
-                                })
-                            })
-                            .unwrap()
+                    |order| match order {
+                        GroupedVanillaOrder::Standing(s) => AllOrders::Standing(s),
+                        GroupedVanillaOrder::KillOrFill(s) => AllOrders::Flash(s)
                     },
                     SimValidation::calculate_user_gas
                 );
@@ -128,19 +118,11 @@ impl OrderValidationResults {
                 let res = Self::map_and_process(
                     order,
                     sim,
-                    |order| {
-                        order
-                            .try_map_inner(|order| match order {
-                                AllOrders::TOB(s) => Ok(s),
-                                _ => unreachable!()
-                            })
-                            .unwrap()
+                    |order| match order {
+                        AllOrders::TOB(s) => Ok(s),
+                        _ => unreachable!()
                     },
-                    |order| {
-                        order
-                            .try_map_inner(|order| Ok(AllOrders::TOB(order)))
-                            .unwrap()
-                    },
+                    |order| AllOrders::TOB(order),
                     SimValidation::calculate_tob_gas
                 );
                 if res.is_err() {
@@ -152,7 +134,7 @@ impl OrderValidationResults {
                 res
             };
 
-            *self = OrderValidationResults::Valid(finalized_order)
+            *self = OrderValidationResults::Valid(finalized_order.unwrap())
         }
     }
 
@@ -160,14 +142,14 @@ impl OrderValidationResults {
     fn map_and_process<Old, New, DB>(
         order: OrderWithStorageData<Old>,
         sim: &SimValidation<DB>,
-        map_new: impl FnOnce(OrderWithStorageData<Old>) -> OrderWithStorageData<New>,
-        map_old: impl FnOnce(OrderWithStorageData<New>) -> OrderWithStorageData<Old>,
-        calculate_function: impl FnOnce(&SimValidation<DB>, &New) -> eyre::Result<u64>
+        map_new: impl Fn(Old) -> New,
+        map_old: impl Fn(New) -> Old,
+        calculate_function: impl Fn(&SimValidation<DB>, &New) -> eyre::Result<u64>
     ) -> eyre::Result<OrderWithStorageData<Old>>
     where
         DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
     {
-        let mut order = order.try_map_inner(|order| Ok(map_new(order))).unwrap();
+        let mut order = order.try_map_inner(move |order| Ok(map_new(order))).unwrap();
 
         if let Ok(gas_used) = (calculate_function)(sim, &order) {
             order.priority_data.gas += gas_used as u128;
@@ -175,7 +157,7 @@ impl OrderValidationResults {
             return Err(eyre::eyre!("not able to process gas"))
         }
 
-        Ok(map_old(older))
+        order.try_map_inner(move |new_order| Ok(map_old(new_order)))
     }
 }
 
