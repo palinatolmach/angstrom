@@ -145,7 +145,7 @@ impl OrderValidationResults {
         sim: &SimValidation<DB>,
         map_new: impl Fn(Old) -> New,
         map_old: impl Fn(New) -> Old,
-        calculate_function: impl Fn(&SimValidation<DB>, &New) -> eyre::Result<u64>
+        calculate_function: impl Fn(&SimValidation<DB>, &OrderWithStorageData<New>) -> eyre::Result<u64>
     ) -> eyre::Result<OrderWithStorageData<Old>>
     where
         DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
