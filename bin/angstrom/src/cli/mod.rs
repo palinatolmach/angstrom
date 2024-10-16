@@ -14,6 +14,7 @@ use secp256k1::{PublicKey, Secp256k1, SecretKey};
 use tokio::sync::mpsc::{
     channel, unbounded_channel, Receiver, Sender, UnboundedReceiver, UnboundedSender
 };
+use angstrom_types::reth_db_wrapper::RethDbWrapper;
 
 mod network_builder;
 use alloy_chains::Chain;
@@ -212,7 +213,7 @@ pub fn initialize_strom_components<Node: FullNodeComponents, AddOns: NodeAddOns<
         .with_consensus_manager(handles.consensus_tx_op)
         .build_handle(executor.clone(), node.provider.clone());
 
-    let validator = init_validation(node.provider.clone(), config.validation_cache_size);
+    let validator = init_validation(RethDbWrapper::new(node.provider.clone()), config.validation_cache_size);
 
     // Create our pool config
     let pool_config = PoolConfig::default();
