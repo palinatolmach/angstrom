@@ -88,37 +88,94 @@ impl OrderValidationResults {
     where
         DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
     {
-        if let Self::Valid(order) = self {
-            if is_limit {
-                let mut order = order
-                    .try_map_inner(|order| match order {
-                        AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
-                        AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
-                        _ => unreachable!()
-                    })
-                    .unwrap();
+        // TODO: this can be done without a clone but is super annoying
+        let mut this = self.clone();
+        if let Self::Valid(order) = this {
+            let hash = order.order_hash();
+            let finalized_order = if is_limit {
+                let res = Self::map_and_process(
+                    order,
+                    sim,
+                    |order| {
+                        order
+                            .try_map_inner(|order| match order {
+                                AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
+                                AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
+                                _ => unreachable!()
+                            })
+                            .unwrap()
+                    },
+                    |order| {
+                        order
+                            .try_map_inner(|order| {
+                                Ok(match order {
+                                    GroupedVanillaOrder::Standing(s) => AllOrders::Standing(s),
+                                    GroupedVanillaOrder::KillOrFill(s) => AllOrders::Flash(s)
+                                })
+                            })
+                            .unwrap()
+                    },
+                    SimValidation::calculate_user_gas
+                );
+                if res.is_err() {
+                    *self = OrderValidationResults::Invalid(order_hash);
 
-                if let Ok(gas_used) = sim.calculate_user_gas(&order) {
-                    order.priority_data.gas += gas_used as u128;
-                } else {
-                    let order_hash = order.order_hash();
-                    *self = OrderValidationResults::Invalid(order_hash);
+                    return
                 }
+
+                res
             } else {
-                let mut order = order
-                    .try_map_inner(|order| match order {
-                        AllOrders::TOB(s) => Ok(s),
-                        _ => unreachable!()
-                    })
-                    .unwrap();
-                if let Ok(gas_used) = sim.calculate_tob_gas(&order) {
-                    order.priority_data.gas += gas_used as u128;
-                } else {
-                    let order_hash = order.order_hash();
+                let res = Self::map_and_process(
+                    order,
+                    sim,
+                    |order| {
+                        order
+                            .try_map_inner(|order| match order {
+                                AllOrders::TOB(s) => Ok(s),
+                                _ => unreachable!()
+                            })
+                            .unwrap()
+                    },
+                    |order| {
+                        order
+                            .try_map_inner(|order| Ok(AllOrders::TOB(order)))
+                            .unwrap()
+                    },
+                    SimValidation::calculate_tob_gas
+                );
+                if res.is_err() {
                     *self = OrderValidationResults::Invalid(order_hash);
+
+                    return
                 }
-            }
+
+                res
+            };
+
+            *self = OrderValidationResults::Valid(finalized_order)
         }
+    }
+
+    // hmm the structure here is probably overkill to avoid 8 extra lines of code
+    fn map_and_process<Old, New, DB>(
+        order: OrderWithStorageData<Old>,
+        sim: &SimValidation<DB>,
+        map_new: impl FnOnce(OrderWithStorageData<Old>) -> OrderWithStorageData<New>,
+        map_old: impl FnOnce(OrderWithStorageData<New>) -> OrderWithStorageData<Old>,
+        calculate_function: impl FnOnce(&SimValidation<DB>, &New) -> eyre::Result<u64>
+    ) -> eyre::Result<OrderWithStorageData<Old>>
+    where
+        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+    {
+        let mut order = order.try_map_inner(|order| Ok(map_new(order))).unwrap();
+
+        if let Ok(gas_used) = (calculate_function)(sim, &order) {
+            order.priority_data.gas += gas_used as u128;
+        } else {
+            return Err(eyre::eyre!("not able to process gas"))
+        }
+
+        Ok(map_old(older))
     }
 }
 
