@@ -91,14 +91,14 @@ impl OrderValidationResults {
         // TODO: this can be done without a clone but is super annoying
         let mut this = self.clone();
         if let Self::Valid(order) = this {
-            let hash = order.order_hash();
+            let order_hash = order.order_hash();
             let finalized_order = if is_limit {
                 let res = Self::map_and_process(
                     order,
                     sim,
                     |order| match order {
-                        AllOrders::Standing(s) => Ok(GroupedVanillaOrder::Standing(s)),
-                        AllOrders::Flash(f) => Ok(GroupedVanillaOrder::KillOrFill(f)),
+                        AllOrders::Standing(s) => GroupedVanillaOrder::Standing(s),
+                        AllOrders::Flash(f) => GroupedVanillaOrder::KillOrFill(f),
                         _ => unreachable!()
                     },
                     |order| match order {
@@ -107,6 +107,7 @@ impl OrderValidationResults {
                     },
                     SimValidation::calculate_user_gas
                 );
+
                 if res.is_err() {
                     *self = OrderValidationResults::Invalid(order_hash);
 
@@ -119,7 +120,7 @@ impl OrderValidationResults {
                     order,
                     sim,
                     |order| match order {
-                        AllOrders::TOB(s) => Ok(s),
+                        AllOrders::TOB(s) => s,
                         _ => unreachable!()
                     },
                     |order| AllOrders::TOB(order),

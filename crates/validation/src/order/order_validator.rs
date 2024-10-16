@@ -83,13 +83,13 @@ where
                 match order {
                     OrderValidation::Limit(tx, order, origin) => {
                         let mut results = cloned_state.handle_regular_order(order, block, true);
-                        results.add_gas_cost_or_invalidate(&cloned_sim);
+                        results.add_gas_cost_or_invalidate(&cloned_sim, true);
 
                         let _ = tx.send(results);
                     }
                     OrderValidation::Searcher(tx, order, origin) => {
                         let results = cloned_state.handle_regular_order(order, block, false);
-                        results.add_gas_cost_or_invalidate(&cloned_sim);
+                        results.add_gas_cost_or_invalidate(&cloned_sim,false);
 
                         let _ = tx.send(results);
                     }

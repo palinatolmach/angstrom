@@ -42,7 +42,7 @@ pub struct Validator<DB, Pools, Fetch> {
 
 impl<DB, Pools, Fetch> Validator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static,
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
     Pools: PoolsTracker + Sync + 'static,
     Fetch: StateFetchUtils + Sync + 'static
 {
@@ -69,7 +69,7 @@ where
 
 impl<DB, Pools, Fetch> Future for Validator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static,
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
     Pools: PoolsTracker + Sync + Unpin + 'static,
     Fetch: StateFetchUtils + Sync + Unpin + 'static
 {
