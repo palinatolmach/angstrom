@@ -1,6 +1,5 @@
 use std::future::IntoFuture;
 
-use reth_revm::InMemoryDB
 use alloy::{primitives::keccak256, providers::Provider, transports::TransportResult};
 use eyre::bail;
 use futures::Future;
