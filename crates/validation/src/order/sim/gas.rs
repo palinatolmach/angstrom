@@ -60,7 +60,8 @@ pub struct OrderGasCalculations<DB> {
 
 impl<DB> OrderGasCalculations<DB>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync
 {
     pub fn new(db: Arc<DB>) -> eyre::Result<Self> {
         let ConfiguredRevm { db, uni_swap, angstrom } =
@@ -158,9 +159,7 @@ where
 
     /// deploys angstrom + univ4 and then sets DEFAULT_FROM address as a node in
     /// the network.
-    fn setup_revm_cache_database_for_simulation(
-        db: Arc<DB>
-    ) -> eyre::Result<ConfiguredRevm<DB>> {
+    fn setup_revm_cache_database_for_simulation(db: Arc<DB>) -> eyre::Result<ConfiguredRevm<DB>> {
         let mut cache_db = CacheDB::new(db.clone());
 
         let (out, cache_db) = Self::execute_with_db(cache_db, |tx| {

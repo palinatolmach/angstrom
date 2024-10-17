@@ -23,7 +23,8 @@ pub struct SimValidation<DB> {
 
 impl<DB> SimValidation<DB>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync
 {
     pub fn new(db: Arc<DB>) -> Self {
         let gas_calculator = OrderGasCalculations::new(db.clone())

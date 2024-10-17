@@ -14,7 +14,7 @@ use std::{
 };
 
 use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
-use common::db::{BlockStateProviderFactory };
+use common::db::BlockStateProviderFactory;
 use futures::Stream;
 use order::state::{
     config::load_validation_config,
@@ -40,7 +40,10 @@ pub fn init_validation<
 >(
     db: DB,
     cache_max_bytes: usize
-) -> ValidationClient {
+) -> ValidationClient
+where
+    <DB as revm::DatabaseRef>::Error: Send + Sync
+{
     let (validator_tx, validator_rx) = unbounded_channel();
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
@@ -79,7 +82,10 @@ pub fn init_validation_tests<
     cache_max_bytes: usize,
     state: State,
     pool: Pool
-) -> (ValidationClient, Arc<DB>) {
+) -> (ValidationClient, Arc<DB>)
+where
+    <DB as revm::DatabaseRef>::Error: Send + Sync
+{
     let (tx, rx) = unbounded_channel();
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();

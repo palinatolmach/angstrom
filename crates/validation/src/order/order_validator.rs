@@ -33,6 +33,7 @@ pub struct OrderValidator<DB, Pools, Fetch> {
 impl<DB, Pools, Fetch> OrderValidator<DB, Pools, Fetch>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + 'static,
     Fetch: StateFetchUtils + Sync + 'static
 {
