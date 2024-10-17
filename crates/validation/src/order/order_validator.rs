@@ -89,7 +89,8 @@ where
                         let _ = tx.send(results);
                     }
                     OrderValidation::Searcher(tx, order, origin) => {
-                        let mut results = cloned_state.handle_regular_order(order, block_number, false);
+                        let mut results =
+                            cloned_state.handle_regular_order(order, block_number, false);
                         results.add_gas_cost_or_invalidate(&cloned_sim, false);
 
                         let _ = tx.send(results);
@@ -107,7 +108,7 @@ where
 
 impl<DB, Pools, Fetch> Future for OrderValidator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Clone + Unpin + 'static,
+    DB: BlockStateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef,
     Pools: PoolsTracker + Sync + Unpin + 'static,
     Fetch: StateFetchUtils + Sync + Unpin + 'static
 {
