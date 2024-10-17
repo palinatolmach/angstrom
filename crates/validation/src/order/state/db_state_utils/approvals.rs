@@ -23,7 +23,7 @@ impl Approvals {
         &self,
         user: Address,
         token: Address,
-        db: Arc<RevmLRU<DB>>,
+        db: Arc<DB>,
         overrides: &HashMap<Address, HashMap<U256, U256>>
     ) -> Option<U256> {
         self.0.get(&token).and_then(|slot| {
@@ -42,7 +42,7 @@ impl Approvals {
         &self,
         user: Address,
         token: Address,
-        db: &RevmLRU<DB>
+        db: &DB
     ) -> Option<U256> {
         self.0
             .get(&token)

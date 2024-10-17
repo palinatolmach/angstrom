@@ -37,6 +37,7 @@ alloy-sol-types.workspace = true
 reth-node-types.workspace = true
 reth-node-ethereum.workspace = true
 reth-revm.workspace = true
+revm.workspace = true
 reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth", version = "1.0.7", tag = "v1.0.7" }
 reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth", version = "1.0.7", tag = "v1.0.7" }
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth", version = "1.0.7", tag = "v1.0.7" }

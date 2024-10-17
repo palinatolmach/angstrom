@@ -32,15 +32,19 @@ type ValidatorOperation<DB, T> =
         T
     ) -> Pin<Box<dyn Future<Output = (TestOrderValidator<DB>, T)>>>;
 
-pub struct TestOrderValidator<DB: StateProviderFactory + Clone + Unpin + 'static> {
+pub struct TestOrderValidator<
+    DB: StateProviderFactory + revm::DatabaseRef + Clone + Unpin + 'static
+> {
     /// allows us to set values to ensure
-    pub revm_lru:   Arc<RevmLRU<DB>>,
+    pub db:         Arc<DB>,
     pub config:     ValidationConfig,
     pub client:     ValidationClient,
     pub underlying: Validator<DB, AngstromPoolsTracker, FetchUtils<DB>>
 }
 
-impl<DB: StateProviderFactory + Clone + Unpin + 'static> TestOrderValidator<DB> {
+impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef>
+    TestOrderValidator<DB>
+{
     pub fn new(db: DB) -> Self {
         let (tx, rx) = unbounded_channel();
         let config_path = Path::new("./state_config.toml");
@@ -48,21 +52,22 @@ impl<DB: StateProviderFactory + Clone + Unpin + 'static> TestOrderValidator<DB> 
         let validation_config = load_validation_config(config_path).unwrap();
         tracing::debug!(?fetch_config, ?validation_config);
         let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
-        let revm_lru = Arc::new(RevmLRU::new(10000000, Arc::new(db), current_block.clone()));
+        // let revm_lru = Arc::new(RevmLRU::new(10000000, Arc::new(db),
+        // current_block.clone()));
 
-        let fetch = FetchUtils::new(fetch_config.clone(), revm_lru.clone());
+        let fetch = FetchUtils::new(fetch_config.clone(), db.clone());
         let pools = AngstromPoolsTracker::new(validation_config.clone());
 
         let handle = tokio::runtime::Handle::current();
         let thread_pool =
             KeySplitThreadpool::new(handle, validation_config.max_validation_per_user);
-        let sim = SimValidation::new(revm_lru.clone());
+        let sim = SimValidation::new(db.clone());
         let order_validator = OrderValidator::new(sim, current_block, pools, fetch, thread_pool);
         let val = Validator::new(rx, order_validator);
         let client = ValidationClient(tx);
         let config = ValidationConfig::default();
 
-        Self { revm_lru, client, underlying: val, config: validation_config }
+        Self { db, client, underlying: val, config: validation_config }
     }
 
     pub async fn poll_for(&mut self, duration: Duration) {
@@ -84,14 +89,14 @@ impl<DB: StateProviderFactory + Clone + Unpin + 'static> TestOrderValidator<DB> 
     }
 }
 
-pub struct OrderValidatorChain<DB: StateProviderFactory + Clone + Unpin + 'static, T: 'static> {
+pub struct OrderValidatorChain<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef, T: 'static> {
     validator:     TestOrderValidator<DB>,
     state:         T,
     operations:    Vec<Box<ValidatorOperation<DB, T>>>,
     poll_duration: Duration
 }
 
-impl<DB: StateProviderFactory + Clone + Unpin + 'static, T: 'static> OrderValidatorChain<DB, T> {
+impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef, T: 'static> OrderValidatorChain<DB, T> {
     pub fn new(validator: TestOrderValidator<DB>, poll_duration: Duration, state: T) -> Self {
         Self { poll_duration, validator, operations: vec![], state }
     }

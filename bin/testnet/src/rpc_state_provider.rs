@@ -84,12 +84,13 @@ impl reth_revm::DatabaseRef for RpcStateProviderFactory {
         address: Address
     ) -> Result<Option<reth_revm::primitives::AccountInfo>, Self::Error> {
         let acc = async_to_sync(self.provider.get_account(address).latest().into_future())?;
-        let code = async_to_sync(self.provider.get_code_at(address).latest().into_future())?;
+        let code =
+            Some(async_to_sync(self.provider.get_code_at(address).latest().into_future())?.into());
 
         Ok(Some(reth_revm::primitives::AccountInfo {
             code_hash: acc.code_hash,
-            balance:   acc.balance,
-            nonce:     acc.nonce,
+            balance: acc.balance,
+            nonce: acc.nonce,
             code
         }))
     }
@@ -118,9 +119,8 @@ impl reth_revm::DatabaseRef for RpcStateProviderFactory {
         &self,
         code_hash: reth_primitives::B256
     ) -> Result<reth_revm::primitives::Bytecode, Self::Error> {
-      panic!("This should not be called, as the code is already loaded");
+        panic!("This should not be called, as the code is already loaded");
     }
-
 }
 
 impl BlockStateProviderFactory for RpcStateProviderFactory {

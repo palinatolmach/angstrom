@@ -52,7 +52,7 @@ pub struct FetchUtils<DB> {
     pub approvals: Approvals,
     pub balances:  Balances,
     pub nonces:    Nonces,
-    pub db:        Arc<RevmLRU<DB>>
+    pub db:        Arc<DB>
 }
 
 impl<DB> StateFetchUtils for FetchUtils<DB>
@@ -97,7 +97,7 @@ where
 }
 
 impl<DB: BlockStateProviderFactory> FetchUtils<DB> {
-    pub fn new(config: DataFetcherConfig, db: Arc<RevmLRU<DB>>) -> Self {
+    pub fn new(config: DataFetcherConfig, db: Arc<DB>) -> Self {
         Self {
             approvals: Approvals::new(
                 config

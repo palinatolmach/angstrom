@@ -27,7 +27,7 @@ impl Nonces {
         &self,
         user: Address,
         nonce: u64,
-        db: Arc<RevmLRU<DB>>
+        db: Arc<DB>
     ) -> bool {
         let slot = self.get_nonce_word_slot(user, nonce);
 

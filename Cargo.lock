@@ -10177,6 +10177,7 @@ dependencies = [
  "reth-tokio-util",
  "reth-tracing",
  "reth-transaction-pool",
+ "revm 14.0.2",
  "secp256k1 0.29.1",
  "serial_test",
  "tempfile",
