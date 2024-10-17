@@ -52,7 +52,7 @@ const DEFAULT_FROM: Address =
 /// (Bundle execution cost - Sum(Orders Gas payed)) / len(Orders)
 #[derive(Clone)]
 pub struct OrderGasCalculations<DB> {
-    db:               CacheDB<Arc<RevmLRU<DB>>>,
+    db:               CacheDB<Arc<DB>>,
     // the deployed addresses in cache_db
     angstrom_address: Address,
     uniswap_address:  Address
@@ -62,7 +62,7 @@ impl<DB> OrderGasCalculations<DB>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
 {
-    pub fn new(db: Arc<RevmLRU<DB>>) -> eyre::Result<Self> {
+    pub fn new(db: Arc<DB>) -> eyre::Result<Self> {
         let ConfiguredRevm { db, uni_swap, angstrom } =
             Self::setup_revm_cache_database_for_simulation(db)?;
 

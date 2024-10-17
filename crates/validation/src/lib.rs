@@ -46,7 +46,7 @@ pub fn init_validation<
     let validation_config = load_validation_config(config_path).unwrap();
     let data_fetcher_config = load_data_fetcher_config(config_path).unwrap();
     let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
-    let revm_lru = Arc::new(RevmLRU::new(cache_max_bytes, Arc::new(db), current_block.clone()));
+    let revm_lru = Arc::new(db);
     let fetch = FetchUtils::new(data_fetcher_config.clone(), revm_lru.clone());
 
     std::thread::spawn(move || {
@@ -79,13 +79,13 @@ pub fn init_validation_tests<
     cache_max_bytes: usize,
     state: State,
     pool: Pool
-) -> (ValidationClient, Arc<RevmLRU<DB>>) {
+) -> (ValidationClient, Arc<DB>) {
     let (tx, rx) = unbounded_channel();
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
     let fetcher_config = load_data_fetcher_config(config_path).unwrap();
     let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
-    let revm_lru = Arc::new(RevmLRU::new(cache_max_bytes, Arc::new(db), current_block.clone()));
+    let revm_lru = Arc::new(db);
     let task_db = revm_lru.clone();
 
     std::thread::spawn(move || {

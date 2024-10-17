@@ -17,7 +17,7 @@ mod gas_inspector;
 /// validation relating to simulations.
 #[derive(Clone)]
 pub struct SimValidation<DB> {
-    db:             Arc<RevmLRU<DB>>,
+    db:             Arc<DB>,
     gas_calculator: OrderGasCalculations<DB>
 }
 
@@ -25,7 +25,7 @@ impl<DB> SimValidation<DB>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
 {
-    pub fn new(db: Arc<RevmLRU<DB>>) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         let gas_calculator = OrderGasCalculations::new(db.clone())
             .expect("failed to deploy baseline angstrom for gas calculations");
         Self { db, gas_calculator }
