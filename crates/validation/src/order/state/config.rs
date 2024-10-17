@@ -63,7 +63,7 @@ impl TokenBalanceSlot {
         Ok(U256::from_be_bytes(*keccak256(buf)))
     }
 
-    pub fn load_balance<DB: BlockStateProviderFactory>(
+    pub fn load_balance<DB: revm::DatabaseRef>(
         &self,
         of: Address,
         db: &DB
@@ -95,7 +95,7 @@ impl TokenApprovalSlot {
         Ok(U256::from_be_bytes(*keccak256(next)))
     }
 
-    pub fn load_approval_amount<DB: BlockStateProviderFactory>(
+    pub fn load_approval_amount<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         contract: Address,

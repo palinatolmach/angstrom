@@ -36,7 +36,7 @@ use revm::{
 };
 
 use super::gas_inspector::{GasSimulationInspector, GasUsed};
-use crate::{BlockStateProviderFactory};
+use crate::BlockStateProviderFactory;
 
 /// A address we can use to deploy contracts
 const DEFAULT_FROM: Address =
@@ -159,7 +159,7 @@ where
     /// deploys angstrom + univ4 and then sets DEFAULT_FROM address as a node in
     /// the network.
     fn setup_revm_cache_database_for_simulation(
-        db: Arc<RevmLRU<DB>>
+        db: Arc<DB>
     ) -> eyre::Result<ConfiguredRevm<DB>> {
         let mut cache_db = CacheDB::new(db.clone());
 
@@ -219,7 +219,7 @@ where
     fn fetch_db_with_overrides(
         &self,
         overrides: OverridesForTestAngstrom
-    ) -> eyre::Result<CacheDB<Arc<RevmLRU<DB>>>> {
+    ) -> eyre::Result<CacheDB<Arc<DB>>> {
         // fork db
         let mut cache_db = self.db.clone();
 
@@ -291,7 +291,7 @@ where
 struct ConfiguredRevm<DB> {
     pub uni_swap: Address,
     pub angstrom: Address,
-    pub db:       CacheDB<Arc<RevmLRU<DB>>>
+    pub db:       CacheDB<Arc<DB>>
 }
 
 struct OverridesForTestAngstrom {

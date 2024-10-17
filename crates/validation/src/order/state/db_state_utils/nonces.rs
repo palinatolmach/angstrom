@@ -5,7 +5,7 @@ use reth_primitives::keccak256;
 use reth_revm::DatabaseRef;
 
 use super::ANGSTROM_CONTRACT;
-use crate::order::state::{BlockStateProviderFactory, RevmLRU};
+use crate::order::state::{BlockStateProviderFactory};
 
 /// The nonce location for quick db lookup
 const ANGSTROM_NONCE_SLOT_CONST: [u8; 4] = hex!("daa050e9");
@@ -23,7 +23,7 @@ impl Nonces {
         keccak256(arry)
     }
 
-    pub fn is_valid_nonce<DB: BlockStateProviderFactory>(
+    pub fn is_valid_nonce<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         nonce: u64,

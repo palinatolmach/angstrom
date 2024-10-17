@@ -30,7 +30,7 @@ pub trait BlockStateProvider {
     ) -> ProviderResult<Option<StorageValue>>;
 }
 
-pub trait BlockStateProviderFactory: Send + Sync {
+pub trait BlockStateProviderFactory: StateProviderFactory + Send + Sync {
     type Provider: BlockStateProvider;
 
     fn state_by_block(&self, block: u64) -> ProviderResult<Self::Provider>;

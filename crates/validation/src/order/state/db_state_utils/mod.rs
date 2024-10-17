@@ -57,7 +57,7 @@ pub struct FetchUtils<DB> {
 
 impl<DB> StateFetchUtils for FetchUtils<DB>
 where
-    DB: BlockStateProviderFactory + Clone
+    DB: BlockStateProviderFactory + revm::DatabaseRef + Clone
 {
     fn is_valid_nonce(&self, user: Address, nonce: u64) -> bool {
         let db = self.db.clone();

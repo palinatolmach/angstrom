@@ -19,7 +19,7 @@ use super::{
     OrderValidationRequest
 };
 use crate::{
-    common::lru_db::BlockStateProviderFactory,
+    common::db::BlockStateProviderFactory,
     order::{state::account::UserAccountProcessor, OrderValidation}
 };
 
