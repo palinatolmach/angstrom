@@ -1,7 +1,7 @@
 // Allows us to impl revm::DatabaseRef on the default provider type.
 use reth_provider::{
-    AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, StateProofProvider,
-    StateProvider, StateProviderFactory 
+    AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, ProviderResult,
+    StateProofProvider, StateProvider, StateProviderFactory
 };
 use reth_storage_api::{StateRootProvider, StorageRootProvider};
 use reth_trie::{
@@ -64,7 +64,7 @@ where
         &self,
         id: reth_primitives::BlockHashOrNumber
     ) -> reth_provider::ProviderResult<Option<reth_primitives::B256>> {
-        self.0.convert_block_number(num)
+        self.0.convert_number(id)
     }
 
     fn best_block_number(&self) -> reth_provider::ProviderResult<reth_primitives::BlockNumber> {
