@@ -4,7 +4,7 @@ use alloy::primitives::{Address, U256};
 use reth_revm::DatabaseRef;
 
 use crate::{
-    common::lru_db::{BlockStateProviderFactory, RevmLRU},
+    common::db::{BlockStateProviderFactory},
     order::state::config::TokenBalanceSlot
 };
 

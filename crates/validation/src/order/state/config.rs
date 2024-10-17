@@ -6,7 +6,7 @@ use reth_primitives::{keccak256, U256};
 use reth_revm::DatabaseRef;
 use serde::Deserialize;
 
-use crate::common::lru_db::{BlockStateProviderFactory, RevmLRU};
+use crate::common::db::{BlockStateProviderFactory};
 #[derive(Debug, Clone, Deserialize)]
 pub struct DataFetcherConfig {
     pub approvals: Vec<TokenApprovalSlot>,

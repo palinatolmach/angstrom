@@ -10,7 +10,7 @@ use revm::{Database, Inspector};
 
 use self::{approvals::Approvals, balances::Balances, nonces::Nonces};
 use super::config::DataFetcherConfig;
-use crate::common::lru_db::{BlockStateProvider, BlockStateProviderFactory, RevmLRU};
+use crate::common::db::{BlockStateProvider, BlockStateProviderFactory};
 
 pub const ANGSTROM_CONTRACT: Address = Address::new([0; 20]);
 

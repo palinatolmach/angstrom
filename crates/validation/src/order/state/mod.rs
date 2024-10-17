@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use pools::PoolsTracker;
 
 use super::{OrderValidation, OrderValidationResults};
-use crate::common::lru_db::{BlockStateProviderFactory, RevmLRU};
+use crate::common::db::{BlockStateProviderFactory};
 
 pub mod account;
 pub mod config;

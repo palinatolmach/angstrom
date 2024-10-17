@@ -13,7 +13,7 @@ use tokio::{
 };
 
 use crate::{
-    common::lru_db::BlockStateProviderFactory,
+    common::db::BlockStateProviderFactory,
     order::{
         order_validator::OrderValidator,
         sim::SimValidation,

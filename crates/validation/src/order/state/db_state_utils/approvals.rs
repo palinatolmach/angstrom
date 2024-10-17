@@ -9,7 +9,7 @@ use reth_provider::StateProvider;
 use reth_revm::DatabaseRef;
 
 use super::ANGSTROM_CONTRACT;
-use crate::order::state::{config::TokenApprovalSlot, BlockStateProviderFactory, RevmLRU};
+use crate::order::state::{config::TokenApprovalSlot, BlockStateProviderFactory};
 
 #[derive(Clone)]
 pub struct Approvals(HashMap<Address, TokenApprovalSlot>);

@@ -63,4 +63,3 @@ impl<T: StateProviderFactory> BlockStateProviderFactory for T {
         BlockNumReader::best_block_number(self)
     }
 }
-

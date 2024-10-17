@@ -14,7 +14,7 @@ use std::{
 };
 
 use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
-use common::lru_db::{BlockStateProviderFactory, RevmLRU};
+use common::db::{BlockStateProviderFactory };
 use futures::Stream;
 use order::state::{
     config::load_validation_config,

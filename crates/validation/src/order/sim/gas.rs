@@ -36,7 +36,7 @@ use revm::{
 };
 
 use super::gas_inspector::{GasSimulationInspector, GasUsed};
-use crate::{BlockStateProviderFactory, RevmLRU};
+use crate::{BlockStateProviderFactory};
 
 /// A address we can use to deploy contracts
 const DEFAULT_FROM: Address =
