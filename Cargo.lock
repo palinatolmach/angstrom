@@ -1309,6 +1309,7 @@ dependencies = [
  "pade",
  "pade-macro",
  "rand",
+ "reth-chainspec",
  "reth-codecs",
  "reth-network-peers",
  "reth-primitives",

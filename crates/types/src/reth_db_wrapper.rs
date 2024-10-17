@@ -1,4 +1,6 @@
 // Allows us to impl revm::DatabaseRef on the default provider type.
+use reth_chainspec::ChainInfo;
+use reth_primitives::{Address, Bytecode, B256, U256};
 use reth_provider::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, ProviderResult,
     StateProofProvider, StateProvider, StateProviderFactory
@@ -8,42 +10,62 @@ use reth_trie::{
     updates::TrieUpdates, AccountProof, HashedPostState, HashedStorage, MultiProof, TrieInput
 };
 
+#[derive(Clone)]
 pub struct RethDbWrapper<DB: StateProviderFactory + Unpin + Clone + 'static>(DB);
 
 impl<DB> RethDbWrapper<DB>
 where
     DB: StateProviderFactory + Unpin + Clone + 'static
 {
-    fn new(db: DB) -> Self {
+    pub fn new(db: DB) -> Self {
         Self(db)
     }
 }
-// impl<DB> BlockHashReader for RethDbWrapper<DB>
-// where
-//     DB: StateProviderFactory + Unpin + Clone + 'static
-// {
-//     fn block_hash(
-//         &self,
-//         number: reth_primitives::BlockNumber
-//     ) -> reth_provider::ProviderResult<Option<reth_primitives::B256>> {
-//         self.0.block_hash(number)
-//     }
-//
-//     fn canonical_hashes_range(
-//         &self,
-//         start: reth_primitives::BlockNumber,
-//         end: reth_primitives::BlockNumber
-//     ) -> reth_provider::ProviderResult<Vec<reth_primitives::B256>> {
-//         self.0.canonical_hashes_range(start, end)
-//     }
-//
-//     fn convert_block_hash(
-//         &self,
-//         hash_or_number: reth_primitives::BlockHashOrNumber
-//     ) -> reth_provider::ProviderResult<Option<reth_primitives::B256>> {
-//         self.0.convert_block_hash(hash_or_number)
-//     }
-// }
+
+impl<DB> revm::DatabaseRef for RethDbWrapper<DB>
+where
+    DB: StateProviderFactory + Unpin + Clone + 'static
+{
+    type Error = eyre::Error;
+
+    /// Retrieves basic account information for a given address.
+    ///
+    /// Returns `Ok` with `Some(AccountInfo)` if the account exists,
+    /// `None` if it doesn't, or an error if encountered.
+    fn basic_ref(
+        &self,
+        address: Address
+    ) -> Result<Option<revm::primitives::AccountInfo>, Self::Error> {
+        Ok(self.basic_account(address)?.map(Into::into))
+    }
+
+    /// Retrieves the bytecode associated with a given code hash.
+    ///
+    /// Returns `Ok` with the bytecode if found, or the default bytecode
+    /// otherwise.
+    fn code_by_hash_ref(&self, code_hash: B256) -> Result<revm::primitives::Bytecode, Self::Error> {
+        Ok(self.bytecode_by_hash(code_hash)?.unwrap_or_default().0)
+    }
+
+    /// Retrieves the storage value at a specific index for a given address.
+    ///
+    /// Returns `Ok` with the storage value, or the default value if not found.
+    fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
+        Ok(self
+            .storage(address, B256::new(index.to_be_bytes()))?
+            .unwrap_or_default())
+    }
+
+    /// Retrieves the block hash for a given block number.
+    ///
+    /// Returns `Ok` with the block hash if found, or the default hash
+    /// otherwise.
+    fn block_hash_ref(&self, number: u64) -> Result<B256, Self::Error> {
+        // Get the block hash or default hash with an attempt to convert U256 block
+        // number to u64
+        Ok(self.0.block_hash(number)?.unwrap_or_default())
+    }
+}
 
 impl<DB> BlockNumReader for RethDbWrapper<DB>
 where
