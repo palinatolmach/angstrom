@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use alloy::primitives::{hex, Address, B256, U256};
 use reth_primitives::keccak256;
 use reth_revm::DatabaseRef;
 
 use super::ANGSTROM_CONTRACT;
-use crate::order::state::{BlockStateProviderFactory};
+use crate::order::state::BlockStateProviderFactory;
 
 /// The nonce location for quick db lookup
 const ANGSTROM_NONCE_SLOT_CONST: [u8; 4] = hex!("daa050e9");
@@ -28,7 +28,10 @@ impl Nonces {
         user: Address,
         nonce: u64,
         db: Arc<DB>
-    ) -> bool {
+    ) -> bool
+    where
+        <DB as DatabaseRef>::Error: Sync + Send + 'static + Debug
+    {
         let slot = self.get_nonce_word_slot(user, nonce);
 
         let word = db.storage_ref(ANGSTROM_CONTRACT, slot.into()).unwrap();

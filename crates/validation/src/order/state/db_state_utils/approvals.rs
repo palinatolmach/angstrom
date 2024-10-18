@@ -19,7 +19,9 @@ impl Approvals {
         Self(current_slots)
     }
 
-    pub fn fetch_approval_balance_for_token_overrides<DB: BlockStateProviderFactory + revm::DatabaseRef>(
+    pub fn fetch_approval_balance_for_token_overrides<
+        DB: BlockStateProviderFactory + revm::DatabaseRef
+    >(
         &self,
         user: Address,
         token: Address,
@@ -38,12 +40,15 @@ impl Approvals {
         })
     }
 
-    pub fn fetch_approval_balance_for_token<DB: BlockStateProviderFactory+ revm::DatabaseRef>(
+    pub fn fetch_approval_balance_for_token<DB: BlockStateProviderFactory + revm::DatabaseRef>(
         &self,
         user: Address,
         token: Address,
         db: &DB
-    ) -> Option<U256> {
+    ) -> Option<U256>
+    where
+        <DB as DatabaseRef>::Error: Sync + Send + 'static
+    {
         self.0
             .get(&token)
             .and_then(|slot| slot.load_approval_amount(user, ANGSTROM_CONTRACT, db).ok())

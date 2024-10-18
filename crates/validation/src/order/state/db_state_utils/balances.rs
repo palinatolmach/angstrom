@@ -3,10 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use alloy::primitives::{Address, U256};
 use reth_revm::DatabaseRef;
 
-use crate::{
-    common::db::{BlockStateProviderFactory},
-    order::state::config::TokenBalanceSlot
-};
+use crate::{common::db::BlockStateProviderFactory, order::state::config::TokenBalanceSlot};
 
 #[derive(Clone)]
 pub struct Balances(HashMap<Address, TokenBalanceSlot>);
@@ -39,7 +36,10 @@ impl Balances {
         user: Address,
         token: Address,
         db: &DB
-    ) -> Option<U256> {
+    ) -> Option<U256>
+    where
+        <DB as DatabaseRef>::Error: Sync + Send + 'static
+    {
         self.0
             .get(&token)
             .and_then(|slot| slot.load_balance(user, db).ok())

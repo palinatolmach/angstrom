@@ -110,6 +110,7 @@ where
 impl<DB, Pools, Fetch> Future for OrderValidator<DB, Pools, Fetch>
 where
     DB: BlockStateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + Unpin + 'static,
     Fetch: StateFetchUtils + Sync + Unpin + 'static
 {

@@ -1,6 +1,6 @@
 // Allows us to impl revm::DatabaseRef on the default provider type.
 use reth_chainspec::ChainInfo;
-use reth_primitives::{Address, Bytecode, B256, U256};
+use reth_primitives::{Address, B256, U256};
 use reth_provider::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, ProviderResult,
     StateProofProvider, StateProvider, StateProviderFactory

@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     pin::Pin,
     sync::{atomic::AtomicU64, Arc},
     task::Poll
@@ -44,7 +45,8 @@ impl<DB, Pools, Fetch> Validator<DB, Pools, Fetch>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
     Pools: PoolsTracker + Sync + 'static,
-    Fetch: StateFetchUtils + Sync + 'static
+    Fetch: StateFetchUtils + Sync + 'static,
+    <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
 {
     pub fn new(
         rx: UnboundedReceiver<ValidationRequest>,
@@ -70,6 +72,7 @@ where
 impl<DB, Pools, Fetch> Future for Validator<DB, Pools, Fetch>
 where
     DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    <DB as revm::DatabaseRef>::Error: Send + Sync + Debug,
     Pools: PoolsTracker + Sync + Unpin + 'static,
     Fetch: StateFetchUtils + Sync + Unpin + 'static
 {

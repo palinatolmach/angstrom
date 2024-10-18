@@ -9,6 +9,7 @@ pub mod order;
 pub mod validator;
 
 use std::{
+    fmt::Debug,
     path::Path,
     sync::{atomic::AtomicU64, Arc}
 };
@@ -42,13 +43,14 @@ pub fn init_validation<
     cache_max_bytes: usize
 ) -> ValidationClient
 where
-    <DB as revm::DatabaseRef>::Error: Send + Sync
+    <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
 {
     let (validator_tx, validator_rx) = unbounded_channel();
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
     let data_fetcher_config = load_data_fetcher_config(config_path).unwrap();
-    let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
+    let current_block =
+        Arc::new(AtomicU64::new(BlockStateProviderFactory::best_block_number(&db).unwrap()));
     let revm_lru = Arc::new(db);
     let fetch = FetchUtils::new(data_fetcher_config.clone(), revm_lru.clone());
 
@@ -84,13 +86,14 @@ pub fn init_validation_tests<
     pool: Pool
 ) -> (ValidationClient, Arc<DB>)
 where
-    <DB as revm::DatabaseRef>::Error: Send + Sync
+    <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
 {
     let (tx, rx) = unbounded_channel();
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
     let fetcher_config = load_data_fetcher_config(config_path).unwrap();
-    let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
+    let current_block =
+        Arc::new(AtomicU64::new(BlockStateProviderFactory::best_block_number(&db).unwrap()));
     let revm_lru = Arc::new(db);
     let task_db = revm_lru.clone();
 

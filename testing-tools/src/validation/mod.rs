@@ -13,7 +13,6 @@ use futures::FutureExt;
 use reth_provider::StateProviderFactory;
 use tokio::sync::mpsc::unbounded_channel;
 use validation::{
-    common::lru_db::RevmLRU,
     order::{
         order_validator::OrderValidator,
         sim::SimValidation,
@@ -42,8 +41,9 @@ pub struct TestOrderValidator<
     pub underlying: Validator<DB, AngstromPoolsTracker, FetchUtils<DB>>
 }
 
-impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef>
-    TestOrderValidator<DB>
+impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef> TestOrderValidator<DB>
+where
+    <DB as revm::DatabaseRef>::Error: Send + Sync + std::fmt::Debug
 {
     pub fn new(db: DB) -> Self {
         let (tx, rx) = unbounded_channel();
@@ -52,8 +52,7 @@ impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef>
         let validation_config = load_validation_config(config_path).unwrap();
         tracing::debug!(?fetch_config, ?validation_config);
         let current_block = Arc::new(AtomicU64::new(db.best_block_number().unwrap()));
-        // let revm_lru = Arc::new(RevmLRU::new(10000000, Arc::new(db),
-        // current_block.clone()));
+        let db = Arc::new(db);
 
         let fetch = FetchUtils::new(fetch_config.clone(), db.clone());
         let pools = AngstromPoolsTracker::new(validation_config.clone());
@@ -89,14 +88,21 @@ impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef>
     }
 }
 
-pub struct OrderValidatorChain<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef, T: 'static> {
+pub struct OrderValidatorChain<
+    DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef,
+    T: 'static
+> {
     validator:     TestOrderValidator<DB>,
     state:         T,
     operations:    Vec<Box<ValidatorOperation<DB, T>>>,
     poll_duration: Duration
 }
 
-impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef, T: 'static> OrderValidatorChain<DB, T> {
+impl<DB: StateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef, T: 'static>
+    OrderValidatorChain<DB, T>
+where
+    <DB as revm::DatabaseRef>::Error: Send + Sync + std::fmt::Debug
+{
     pub fn new(validator: TestOrderValidator<DB>, poll_duration: Duration, state: T) -> Self {
         Self { poll_duration, validator, operations: vec![], state }
     }

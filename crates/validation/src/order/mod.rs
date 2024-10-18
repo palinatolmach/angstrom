@@ -87,7 +87,7 @@ impl OrderValidationResults {
     pub fn add_gas_cost_or_invalidate<DB>(&mut self, sim: &SimValidation<DB>, is_limit: bool)
     where
         DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
-    <DB as revm::DatabaseRef>::Error: Send + Sync
+        <DB as revm::DatabaseRef>::Error: Send + Sync
     {
         // TODO: this can be done without a clone but is super annoying
         let mut this = self.clone();
@@ -149,9 +149,12 @@ impl OrderValidationResults {
         calculate_function: impl Fn(&SimValidation<DB>, &OrderWithStorageData<New>) -> eyre::Result<u64>
     ) -> eyre::Result<OrderWithStorageData<Old>>
     where
-        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
+        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+        <DB as revm::DatabaseRef>::Error: Sync + Send + 'static
     {
-        let mut order = order.try_map_inner(move |order| Ok(map_new(order))).unwrap();
+        let mut order = order
+            .try_map_inner(move |order| Ok(map_new(order)))
+            .unwrap();
 
         if let Ok(gas_used) = (calculate_function)(sim, &order) {
             order.priority_data.gas += gas_used as u128;

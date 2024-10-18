@@ -1,12 +1,14 @@
-use std::path::Path;
+use std::{fmt::Debug, path::Path};
 
 use alloy::primitives::Address;
 use angstrom_types::primitive::PoolId;
+use eyre::eyre;
 use reth_primitives::{keccak256, U256};
 use reth_revm::DatabaseRef;
-use serde::Deserialize;
+use serde::{ser::StdError, Deserialize};
 
-use crate::common::db::{BlockStateProviderFactory};
+use crate::common::db::BlockStateProviderFactory;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct DataFetcherConfig {
     pub approvals: Vec<TokenApprovalSlot>,
@@ -63,12 +65,13 @@ impl TokenBalanceSlot {
         Ok(U256::from_be_bytes(*keccak256(buf)))
     }
 
-    pub fn load_balance<DB: revm::DatabaseRef>(
-        &self,
-        of: Address,
-        db: &DB
-    ) -> eyre::Result<U256> {
-        Ok(db.storage_ref(self.token, self.generate_slot(of)?)?)
+    pub fn load_balance<DB: revm::DatabaseRef>(&self, of: Address, db: &DB) -> eyre::Result<U256>
+    where
+        <DB as DatabaseRef>::Error: Sync + Send + 'static
+    {
+        Ok(db
+            .storage_ref(self.token, self.generate_slot(of)?)
+            .map_err(|_| eyre!("failed to load balance slot"))?)
     }
 }
 
@@ -100,12 +103,17 @@ impl TokenApprovalSlot {
         user: Address,
         contract: Address,
         db: &DB
-    ) -> eyre::Result<U256> {
+    ) -> eyre::Result<U256>
+    where
+        <DB as DatabaseRef>::Error: Sync + Send + 'static
+    {
         if !self.hash_method.is_solidity() {
             return Err(eyre::eyre!("current type of contract hashing is not supported"))
         }
 
-        Ok(db.storage_ref(self.token, self.generate_slot(user, contract)?)?)
+        Ok(db
+            .storage_ref(self.token, self.generate_slot(user, contract)?)
+            .map_err(|_| eyre!("failed to load approval slot"))?)
     }
 }
 

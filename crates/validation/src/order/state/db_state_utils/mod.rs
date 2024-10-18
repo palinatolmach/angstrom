@@ -2,7 +2,7 @@ pub mod approvals;
 pub mod balances;
 pub mod nonces;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use alloy::primitives::{Address, U256};
 use angstrom_types::sol_bindings::ext::RawPoolOrder;
@@ -57,7 +57,8 @@ pub struct FetchUtils<DB> {
 
 impl<DB> StateFetchUtils for FetchUtils<DB>
 where
-    DB: BlockStateProviderFactory + revm::DatabaseRef + Clone
+    DB: BlockStateProviderFactory + revm::DatabaseRef + Clone,
+    <DB as revm::DatabaseRef>::Error: Sync + Send + 'static + Debug
 {
     fn is_valid_nonce(&self, user: Address, nonce: u64) -> bool {
         let db = self.db.clone();

@@ -237,12 +237,12 @@ where
                 (self.angstrom_address, keccak256((user_address, i).abi_encode())).abi_encode()
             );
 
-            cache_db.insert_account_storage(
-                token_out,
-                balance_amount_out_slot.into(),
-                amount_out
-            )?;
-            cache_db.insert_account_storage(token_in, approval_slot.into(), amount_in)?;
+            cache_db
+                .insert_account_storage(token_out, balance_amount_out_slot.into(), amount_out)
+                .map_err(|_| eyre!("failed to insert account into storage"))?;
+            cache_db
+                .insert_account_storage(token_in, approval_slot.into(), amount_in)
+                .map_err(|_| eyre!("failed to insert account into storage"))?;
         }
 
         Ok(cache_db)
@@ -273,7 +273,9 @@ where
                 })
                 .build();
 
-            let result = evm.transact()?;
+            let result = evm
+                .transact()
+                .map_err(|_| eyre!("failed to transact with revm"))?;
 
             if !result.result.is_success() {
                 return Err(eyre::eyre!(

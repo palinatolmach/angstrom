@@ -5,7 +5,7 @@ use eyre::bail;
 use futures::Future;
 use reth_primitives::{Account, Address, BlockNumber, StorageKey, StorageValue};
 use reth_provider::{ProviderError, ProviderResult};
-use validation::common::lru_db::{BlockStateProvider, BlockStateProviderFactory};
+use validation::common::db::{BlockStateProvider, BlockStateProviderFactory};
 
 use crate::anvil_utils::AnvilWalletRpc;
 
