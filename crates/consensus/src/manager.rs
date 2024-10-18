@@ -4,7 +4,7 @@ use std::{
 };
 
 use angstrom_metrics::ConsensusMetricsWrapper;
-use angstrom_network::{manager::StromConsensusEvent, peers, StromMessage, StromNetworkHandle};
+use angstrom_network::{manager::StromConsensusEvent, StromMessage, StromNetworkHandle};
 use angstrom_types::{
     consensus::{PreProposal, Proposal},
     orders::PoolSolution
@@ -13,7 +13,6 @@ use futures::{FutureExt, Stream, StreamExt};
 use matching_engine::MatchingManager;
 use order_pool::{order_storage::OrderStorage, timer::async_time_fn};
 use reth_metrics::common::mpsc::UnboundedMeteredReceiver;
-use reth_primitives::HeaderError::LargeExtraData;
 use reth_provider::{CanonStateNotification, CanonStateNotifications};
 use reth_tasks::TaskSpawner;
 use tokio::{
@@ -107,7 +106,7 @@ impl ConsensusManager {
         let current_block_height = 0;
         let roundstate = RoundState::new(current_block_height, 1, Leader::default(), Some(timings));
         let wrapped_broadcast_stream = BroadcastStream::new(canonical_block_stream);
-        let mut leader_election = WeightedRoundRobin::new(validators, current_block_height, None);
+        let leader_election = WeightedRoundRobin::new(validators, current_block_height, None);
 
         Self {
             strom_consensus_event,

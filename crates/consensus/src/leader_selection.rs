@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    default::Default,
     fs::File,
     io::{self, Read, Write}
 };
@@ -74,7 +73,7 @@ impl WeightedRoundRobin {
             .unwrap()
             .clone();
         proposer.priority -= total_voting_power as f64;
-        let proposer_name = proposer.peer_id.clone();
+        let proposer_name = proposer.peer_id;
         self.validators.replace(proposer);
 
         proposer_name

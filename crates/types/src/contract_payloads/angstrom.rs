@@ -160,9 +160,9 @@ impl AngstromBundle {
         user_order: &OrderWithStorageData<RpcTopOfBlockOrder>
     ) -> eyre::Result<Self> {
         let mut top_of_block_orders = Vec::new();
-        let mut pool_updates = Vec::new();
-        let mut pairs = Vec::new();
-        let mut user_orders = Vec::new();
+        let pool_updates = Vec::new();
+        let pairs = Vec::new();
+        let user_orders = Vec::new();
         let mut asset_builder = AssetBuilder::new();
 
         // Get the information for the pool or skip this solution if we can't find a
@@ -185,11 +185,11 @@ impl AngstromBundle {
         let pair_idx = pairs.len() - 1;
 
         let outcome = OrderOutcome {
-            id:      user_order.order_id.clone(),
+            id:      user_order.order_id,
             outcome: OrderFillState::CompleteFill
         };
         // Get our list of user orders, if we have any
-        top_of_block_orders.push(TopOfBlockOrder::of(&user_order, t0_idx, t1_idx));
+        top_of_block_orders.push(TopOfBlockOrder::of(user_order, t0_idx, t1_idx));
 
         Ok(Self::new(
             asset_builder.get_asset_array(),
@@ -203,9 +203,9 @@ impl AngstromBundle {
     pub fn build_dummy_for_user_gas(
         user_order: &OrderWithStorageData<GroupedVanillaOrder>
     ) -> eyre::Result<Self> {
-        let mut top_of_block_orders = Vec::new();
-        let mut pool_updates = Vec::new();
-        let mut pairs = Vec::new();
+        let top_of_block_orders = Vec::new();
+        let pool_updates = Vec::new();
+        let pairs = Vec::new();
         let mut user_orders = Vec::new();
         let mut asset_builder = AssetBuilder::new();
 
@@ -229,11 +229,11 @@ impl AngstromBundle {
         let pair_idx = pairs.len() - 1;
 
         let outcome = OrderOutcome {
-            id:      user_order.order_id.clone(),
+            id:      user_order.order_id,
             outcome: OrderFillState::CompleteFill
         };
         // Get our list of user orders, if we have any
-        user_orders.push(UserOrder::from_internal_order(&user_order, &outcome, pair_idx as u16));
+        user_orders.push(UserOrder::from_internal_order(user_order, &outcome, pair_idx as u16));
 
         Ok(Self::new(
             asset_builder.get_asset_array(),
@@ -250,7 +250,7 @@ impl AngstromBundle {
     ) -> eyre::Result<Self> {
         let mut top_of_block_orders = Vec::new();
         let mut pool_updates = Vec::new();
-        let mut pairs = Vec::new();
+        let pairs = Vec::new();
         let mut user_orders = Vec::new();
         let mut asset_builder = AssetBuilder::new();
 

@@ -172,7 +172,7 @@ where
         if !out.result.is_success() {
             eyre::bail!("failed to deploy uniswap v4 pool manager");
         }
-        let v4_address = Address::from_slice(&*out.result.output().unwrap());
+        let v4_address = Address::from_slice(out.result.output().unwrap());
 
         // deploy angstrom.
 
@@ -194,7 +194,7 @@ where
         if !out.result.is_success() {
             eyre::bail!("failed to deploy angstrom");
         }
-        let angstrom_address = Address::from_slice(&*out.result.output().unwrap());
+        let angstrom_address = Address::from_slice(out.result.output().unwrap());
 
         // enable default from to call the angstrom contract.
         let (out, mut cache_db) = Self::execute_with_db(cache_db, |tx| {
@@ -280,8 +280,7 @@ where
             if !result.result.is_success() {
                 return Err(eyre::eyre!(
                     "gas simulation had a revert. cannot guarantee the proper gas was estimated"
-                )
-                .into())
+                ))
             }
         }
 

@@ -69,9 +69,9 @@ impl TokenBalanceSlot {
     where
         <DB as DatabaseRef>::Error: Sync + Send + 'static
     {
-        Ok(db
+        db
             .storage_ref(self.token, self.generate_slot(of)?)
-            .map_err(|_| eyre!("failed to load balance slot"))?)
+            .map_err(|_| eyre!("failed to load balance slot"))
     }
 }
 
@@ -111,9 +111,9 @@ impl TokenApprovalSlot {
             return Err(eyre::eyre!("current type of contract hashing is not supported"))
         }
 
-        Ok(db
+        db
             .storage_ref(self.token, self.generate_slot(user, contract)?)
-            .map_err(|_| eyre!("failed to load approval slot"))?)
+            .map_err(|_| eyre!("failed to load approval slot"))
     }
 }
 

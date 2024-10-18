@@ -18,6 +18,12 @@ pub struct AssetBuilder {
     assets:       AssetArray
 }
 
+impl Default for AssetBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AssetBuilder {
     pub fn new() -> Self {
         Self {

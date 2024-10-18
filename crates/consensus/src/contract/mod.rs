@@ -6,8 +6,7 @@ use angstrom_types::{
     consensus::Proposal,
     contract_payloads::{
         angstrom::{AngstromBundle, OrderQuantities, TopOfBlockOrder, UserOrder},
-        rewards::PoolUpdate,
-        Pair
+        rewards::PoolUpdate
     },
     matching::Ray,
     orders::{OrderFillState, OrderOutcome},
@@ -28,7 +27,7 @@ pub fn to_contract_format(
 ) -> Result<AngstromBundle, eyre::Error> {
     let mut top_of_block_orders = Vec::new();
     let mut pool_updates = Vec::new();
-    let mut pairs = Vec::new();
+    let pairs = Vec::new();
     let mut user_orders = Vec::new();
     let mut asset_builder = AssetBuilder::new();
 

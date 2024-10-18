@@ -124,7 +124,7 @@ impl OrderValidationResults {
                         AllOrders::TOB(s) => s,
                         _ => unreachable!()
                     },
-                    |order| AllOrders::TOB(order),
+                    AllOrders::TOB,
                     SimValidation::calculate_tob_gas
                 );
                 if res.is_err() {
