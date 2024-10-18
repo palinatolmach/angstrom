@@ -19,7 +19,7 @@ use testnet::{
     rpc_state_provider::RpcStateProviderFactory
 };
 use tracing::{span, Instrument, Level};
-use validation::init_validation;
+use validation::{common::BlockStateProviderFactory, init_validation};
 
 #[derive(Parser)]
 #[clap(about = "
@@ -123,6 +123,7 @@ pub async fn spawn_testnet_node(
     contract_address: Address,
     id: u64
 ) -> eyre::Result<()> {
+    let block_number = rpc_wrapper.best_block_number().unwrap();
     let span = span!(Level::ERROR, "testnet node", id = id);
     let pool = handles.get_pool_handle();
     let executor: TokioTaskExecutor = Default::default();
@@ -164,8 +165,7 @@ pub async fn spawn_testnet_node(
     )
     .await?;
 
-    let validator = init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE);
-
+    let validator = init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number);
     let network_handle = network.handle.clone();
 
     let pool_config = PoolConfig::default();

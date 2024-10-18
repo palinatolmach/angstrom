@@ -57,7 +57,7 @@ pub struct FetchUtils<DB> {
 
 impl<DB> StateFetchUtils for FetchUtils<DB>
 where
-    DB: BlockStateProviderFactory + revm::DatabaseRef + Clone,
+    DB: revm::DatabaseRef + Clone + Sync + Send,
     <DB as revm::DatabaseRef>::Error: Sync + Send + 'static + Debug
 {
     fn is_valid_nonce(&self, user: Address, nonce: u64) -> bool {
@@ -97,7 +97,7 @@ where
     }
 }
 
-impl<DB: BlockStateProviderFactory> FetchUtils<DB> {
+impl<DB> FetchUtils<DB> {
     pub fn new(config: DataFetcherConfig, db: Arc<DB>) -> Self {
         Self {
             approvals: Approvals::new(

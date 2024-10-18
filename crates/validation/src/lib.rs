@@ -36,11 +36,10 @@ use crate::{
 
 pub const TOKEN_CONFIG_FILE: &str = "./crates/validation/state_config.toml";
 
-pub fn init_validation<
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef
->(
+pub fn init_validation<DB: Unpin + Clone + 'static + revm::DatabaseRef + Send + Sync>(
     db: DB,
-    cache_max_bytes: usize
+    cache_max_bytes: usize,
+    current_block: u64
 ) -> ValidationClient
 where
     <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
@@ -49,8 +48,7 @@ where
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
     let data_fetcher_config = load_data_fetcher_config(config_path).unwrap();
-    let current_block =
-        Arc::new(AtomicU64::new(BlockStateProviderFactory::best_block_number(&db).unwrap()));
+    let current_block = Arc::new(AtomicU64::new(current_block));
     let revm_lru = Arc::new(db);
     let fetch = FetchUtils::new(data_fetcher_config.clone(), revm_lru.clone());
 
@@ -76,14 +74,15 @@ where
 }
 
 pub fn init_validation_tests<
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    DB: Unpin + Clone + 'static + revm::DatabaseRef + Send + Sync,
     State: StateFetchUtils + Sync + 'static,
     Pool: PoolsTracker + Sync + 'static
 >(
     db: DB,
     cache_max_bytes: usize,
     state: State,
-    pool: Pool
+    pool: Pool,
+    block_number: u64
 ) -> (ValidationClient, Arc<DB>)
 where
     <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
@@ -92,8 +91,7 @@ where
     let config_path = Path::new(TOKEN_CONFIG_FILE);
     let validation_config = load_validation_config(config_path).unwrap();
     let fetcher_config = load_data_fetcher_config(config_path).unwrap();
-    let current_block =
-        Arc::new(AtomicU64::new(BlockStateProviderFactory::best_block_number(&db).unwrap()));
+    let current_block = Arc::new(AtomicU64::new(block_number));
     let revm_lru = Arc::new(db);
     let task_db = revm_lru.clone();
 

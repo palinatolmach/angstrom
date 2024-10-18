@@ -5,6 +5,7 @@ use eyre::bail;
 use futures::Future;
 use reth_primitives::{Account, Address, BlockNumber, StorageKey, StorageValue};
 use reth_provider::{ProviderError, ProviderResult};
+use reth_revm::primitives::Bytecode;
 use validation::common::db::{BlockStateProvider, BlockStateProviderFactory};
 
 use crate::anvil_utils::AnvilWalletRpc;
@@ -84,8 +85,8 @@ impl reth_revm::DatabaseRef for RpcStateProviderFactory {
         address: Address
     ) -> Result<Option<reth_revm::primitives::AccountInfo>, Self::Error> {
         let acc = async_to_sync(self.provider.get_account(address).latest().into_future())?;
-        let code =
-            Some(async_to_sync(self.provider.get_code_at(address).latest().into_future())?.into());
+        let code = async_to_sync(self.provider.get_code_at(address).latest().into_future())?;
+        let code = Some(Bytecode::new_raw(code));
 
         Ok(Some(reth_revm::primitives::AccountInfo {
             code_hash: acc.code_hash,

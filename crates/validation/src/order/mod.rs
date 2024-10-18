@@ -86,7 +86,7 @@ pub enum OrderValidationResults {
 impl OrderValidationResults {
     pub fn add_gas_cost_or_invalidate<DB>(&mut self, sim: &SimValidation<DB>, is_limit: bool)
     where
-        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+        DB: Unpin + Clone + 'static + revm::DatabaseRef + Send + Sync,
         <DB as revm::DatabaseRef>::Error: Send + Sync
     {
         // TODO: this can be done without a clone but is super annoying
@@ -149,7 +149,7 @@ impl OrderValidationResults {
         calculate_function: impl Fn(&SimValidation<DB>, &OrderWithStorageData<New>) -> eyre::Result<u64>
     ) -> eyre::Result<OrderWithStorageData<Old>>
     where
-        DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+        DB: Unpin + Clone + 'static + revm::DatabaseRef + Send + Sync,
         <DB as revm::DatabaseRef>::Error: Sync + Send + 'static
     {
         let mut order = order

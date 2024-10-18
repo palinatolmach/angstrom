@@ -5,12 +5,14 @@ use std::{
     sync::{Arc, Mutex}
 };
 
+// use reth_provider::State
 use angstrom_metrics::{initialize_prometheus_metrics, METRICS_ENABLED};
 use angstrom_network::manager::StromConsensusEvent;
 use angstrom_types::reth_db_wrapper::RethDbWrapper;
 use order_pool::{order_storage::OrderStorage, PoolConfig, PoolManagerUpdate};
 use reth::primitives::Address;
 use reth_node_builder::{FullNode, NodeHandle};
+use reth_provider::BlockReaderIdExt;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 use tokio::sync::mpsc::{
     channel, unbounded_channel, Receiver, Sender, UnboundedReceiver, UnboundedSender
@@ -213,8 +215,12 @@ pub fn initialize_strom_components<Node: FullNodeComponents, AddOns: NodeAddOns<
         .with_consensus_manager(handles.consensus_tx_op)
         .build_handle(executor.clone(), node.provider.clone());
 
-    let validator =
-        init_validation(RethDbWrapper::new(node.provider.clone()), config.validation_cache_size);
+    let block = node.provider.pending_header().unwrap().unwrap().number;
+    let validator = init_validation(
+        RethDbWrapper::new(node.provider.clone()),
+        config.validation_cache_size,
+        block
+    );
 
     // Create our pool config
     let pool_config = PoolConfig::default();

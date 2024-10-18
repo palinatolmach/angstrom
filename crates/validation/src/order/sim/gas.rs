@@ -60,7 +60,7 @@ pub struct OrderGasCalculations<DB> {
 
 impl<DB> OrderGasCalculations<DB>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    DB: Unpin + Clone + 'static + revm::DatabaseRef,
     <DB as revm::DatabaseRef>::Error: Send + Sync
 {
     pub fn new(db: Arc<DB>) -> eyre::Result<Self> {

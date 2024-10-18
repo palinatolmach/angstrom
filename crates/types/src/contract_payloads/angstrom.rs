@@ -184,10 +184,8 @@ impl AngstromBundle {
         // TODO this wasn't done when pulled from davids branch.
         let pair_idx = pairs.len() - 1;
 
-        let outcome = OrderOutcome {
-            id:      user_order.order_id,
-            outcome: OrderFillState::CompleteFill
-        };
+        let outcome =
+            OrderOutcome { id: user_order.order_id, outcome: OrderFillState::CompleteFill };
         // Get our list of user orders, if we have any
         top_of_block_orders.push(TopOfBlockOrder::of(user_order, t0_idx, t1_idx));
 
@@ -228,10 +226,8 @@ impl AngstromBundle {
         // TODO this wasn't done when pulled from davids branch.
         let pair_idx = pairs.len() - 1;
 
-        let outcome = OrderOutcome {
-            id:      user_order.order_id,
-            outcome: OrderFillState::CompleteFill
-        };
+        let outcome =
+            OrderOutcome { id: user_order.order_id, outcome: OrderFillState::CompleteFill };
         // Get our list of user orders, if we have any
         user_orders.push(UserOrder::from_internal_order(user_order, &outcome, pair_idx as u16));
 

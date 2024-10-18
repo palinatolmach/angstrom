@@ -13,7 +13,7 @@ impl Balances {
         Self(slots)
     }
 
-    pub fn fetch_balance_for_token_overrides<DB: BlockStateProviderFactory + revm::DatabaseRef>(
+    pub fn fetch_balance_for_token_overrides<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         token: Address,
@@ -31,7 +31,7 @@ impl Balances {
         })
     }
 
-    pub fn fetch_balance_for_token<DB: BlockStateProviderFactory + revm::DatabaseRef>(
+    pub fn fetch_balance_for_token<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         token: Address,

@@ -19,9 +19,7 @@ impl Approvals {
         Self(current_slots)
     }
 
-    pub fn fetch_approval_balance_for_token_overrides<
-        DB: BlockStateProviderFactory + revm::DatabaseRef
-    >(
+    pub fn fetch_approval_balance_for_token_overrides<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         token: Address,
@@ -40,7 +38,7 @@ impl Approvals {
         })
     }
 
-    pub fn fetch_approval_balance_for_token<DB: BlockStateProviderFactory + revm::DatabaseRef>(
+    pub fn fetch_approval_balance_for_token<DB: revm::DatabaseRef>(
         &self,
         user: Address,
         token: Address,

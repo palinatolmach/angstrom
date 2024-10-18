@@ -32,7 +32,7 @@ pub struct OrderValidator<DB, Pools, Fetch> {
 
 impl<DB, Pools, Fetch> OrderValidator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Unpin + Clone + 'static + revm::DatabaseRef,
+    DB: Unpin + Clone + 'static + revm::DatabaseRef + Sync + Send,
     <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + 'static,
     Fetch: StateFetchUtils + Sync + 'static
@@ -109,7 +109,7 @@ where
 
 impl<DB, Pools, Fetch> Future for OrderValidator<DB, Pools, Fetch>
 where
-    DB: BlockStateProviderFactory + Clone + Unpin + 'static + revm::DatabaseRef,
+    DB: Clone + Unpin + 'static + revm::DatabaseRef + Send + Sync,
     <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + Unpin + 'static,
     Fetch: StateFetchUtils + Sync + Unpin + 'static
