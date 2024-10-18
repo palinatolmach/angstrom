@@ -9,9 +9,9 @@ type Tick = i32;
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::U160;
+    
 
-    use super::*;
+    
 
     // #[test]
     // fn requires_contiguous_ticks() {

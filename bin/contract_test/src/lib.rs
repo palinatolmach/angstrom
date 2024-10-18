@@ -2,7 +2,7 @@ use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::Anvil,
     primitives::Address,
-    providers::{builder, IpcConnect, Provider},
+    providers::{builder, IpcConnect},
     signers::local::PrivateKeySigner
 };
 use angstrom_types::contract_bindings::poolmanager::PoolManager;
