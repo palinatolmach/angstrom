@@ -9,9 +9,6 @@ type Tick = i32;
 
 #[cfg(test)]
 mod tests {
-    
-
-    
 
     // #[test]
     // fn requires_contiguous_ticks() {

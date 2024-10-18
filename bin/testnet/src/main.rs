@@ -165,7 +165,8 @@ pub async fn spawn_testnet_node(
     )
     .await?;
 
-    let validator = init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number);
+    let validator =
+        init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number, Some(contract_address));
     let network_handle = network.handle.clone();
 
     let pool_config = PoolConfig::default();
