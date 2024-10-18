@@ -14,6 +14,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc}
 };
 
+use alloy::primitives::Address;
 use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
 use common::db::BlockStateProviderFactory;
 use futures::Stream;
@@ -39,7 +40,8 @@ pub const TOKEN_CONFIG_FILE: &str = "./crates/validation/state_config.toml";
 pub fn init_validation<DB: Unpin + Clone + 'static + revm::DatabaseRef + Send + Sync>(
     db: DB,
     cache_max_bytes: usize,
-    current_block: u64
+    current_block: u64,
+    angstrom_address: Option<Address>
 ) -> ValidationClient
 where
     <DB as revm::DatabaseRef>::Error: Send + Sync + Debug
@@ -64,7 +66,7 @@ where
         let pools = AngstromPoolsTracker::new(validation_config.clone());
         let thread_pool =
             KeySplitThreadpool::new(handle, validation_config.max_validation_per_user);
-        let sim = SimValidation::new(revm_lru.clone());
+        let sim = SimValidation::new(revm_lru.clone(), angstrom_address);
         let order_validator = OrderValidator::new(sim, current_block, pools, fetch, thread_pool);
 
         rt.block_on(async { Validator::new(validator_rx, order_validator).await })
@@ -104,7 +106,7 @@ where
         let handle = rt.handle().clone();
         let thread_pool =
             KeySplitThreadpool::new(handle, validation_config.max_validation_per_user);
-        let sim = SimValidation::new(task_db);
+        let sim = SimValidation::new(task_db, None);
         let order_validator = OrderValidator::new(sim, current_block, pool, state, thread_pool);
 
         rt.block_on(Validator::new(rx, order_validator))

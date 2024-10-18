@@ -219,7 +219,8 @@ pub fn initialize_strom_components<Node: FullNodeComponents, AddOns: NodeAddOns<
     let validator = init_validation(
         RethDbWrapper::new(node.provider.clone()),
         config.validation_cache_size,
-        block
+        block,
+        config.angstrom_addr
     );
 
     // Create our pool config
@@ -278,6 +279,8 @@ pub struct AngstromConfig {
     pub mev_guard:             bool,
     #[clap(long)]
     pub secret_key_location:   PathBuf,
+    #[clap(long)]
+    pub angstrom_addr:         Option<Address>,
     // default is 100mb
     #[clap(long, default_value = "1000000")]
     pub validation_cache_size: usize,
