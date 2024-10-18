@@ -1,5 +1,6 @@
 pub mod consensus;
 pub mod contract_bindings;
+pub mod pair_with_price;
 pub mod contract_payloads;
 pub mod matching;
 pub mod orders;
