@@ -5280,6 +5280,7 @@ dependencies = [
  "itertools 0.12.1",
  "malachite",
  "malachite-q",
+ "num-bigfloat",
  "pade",
  "pade-macro",
  "rand",
