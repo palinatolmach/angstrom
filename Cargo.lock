@@ -1300,6 +1300,7 @@ dependencies = [
  "bytes",
  "derive_more 0.99.18",
  "eyre",
+ "futures",
  "hex-literal",
  "itertools 0.12.1",
  "malachite",
