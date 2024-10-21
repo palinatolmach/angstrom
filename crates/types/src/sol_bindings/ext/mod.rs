@@ -52,6 +52,12 @@ pub enum RespendAvoidanceMethod {
     Block(u64)
 }
 
+impl Default for RespendAvoidanceMethod {
+    fn default() -> Self {
+        Self::Nonce(0)
+    }
+}
+
 impl RespendAvoidanceMethod {
     pub fn get_ord_for_pending_orders(&self) -> u64 {
         let Self::Nonce(n) = self else { return 0 };

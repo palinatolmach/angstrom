@@ -9,7 +9,7 @@ use crate::{
     sol_bindings::{ext::RespendAvoidanceMethod, RawPoolOrder}
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OrderId {
     pub address:         Address,
     /// Pool id

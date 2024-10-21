@@ -120,7 +120,7 @@ impl AllOrders {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderWithStorageData<Order> {
     /// raw order
     pub order:              Order,
@@ -140,7 +140,8 @@ pub struct OrderWithStorageData<Order> {
     /// the block the order was validated for
     pub valid_block:        u64,
     /// holds expiry data
-    pub order_id:           OrderId
+    pub order_id:           OrderId,
+    pub tob_reward:         U256
 }
 
 impl<Order> Hash for OrderWithStorageData<Order> {
@@ -193,7 +194,8 @@ impl<Order> OrderWithStorageData<Order> {
             priority_data:      self.priority_data,
             is_currently_valid: self.is_currently_valid,
             is_valid:           self.is_valid,
-            order_id:           self.order_id
+            order_id:           self.order_id,
+            tob_reward:         U256::ZERO
         })
     }
 }
@@ -384,10 +386,15 @@ impl RawPoolOrder for FlashVariants {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GroupedVanillaOrder {
     Standing(StandingVariants),
     KillOrFill(FlashVariants)
+}
+impl Default for GroupedVanillaOrder {
+    fn default() -> Self {
+        GroupedVanillaOrder::Standing(StandingVariants::Exact(ExactStandingOrder::default()))
+    }
 }
 
 impl GroupedVanillaOrder {

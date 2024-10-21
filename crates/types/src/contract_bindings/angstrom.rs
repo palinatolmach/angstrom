@@ -10,7 +10,6 @@ library IPoolManager {
 pub mod IPoolManager {
     use alloy::sol_types as alloy_sol_types;
 
-    use super::*;
     /**```solidity
     struct ModifyLiquidityParams { int24 tickLower; int24 tickUpper; int256 liquidityDelta; bytes32 salt; }
     ```*/

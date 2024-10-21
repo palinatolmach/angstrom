@@ -18,14 +18,15 @@ use testnet::{
     ported_reth_testnet_network::{connect_all_peers, StromPeer},
     rpc_state_provider::RpcStateProviderFactory
 };
+use tokio::sync::broadcast;
 use tracing::{span, Instrument, Level};
 use validation::{common::BlockStateProviderFactory, init_validation};
 
 #[derive(Parser)]
 #[clap(about = "
 Angstrom Anvil Testnet.
-Anvil must be installed on the system in order to spin up \
-                the testnode. 
+Anvil must be installed on the system in order to spin up the \
+                testnode. 
 To install run `curl -L https://foundry.paradigm.xyz | bash`. then run foundryup to install anvil
     ")]
 struct Cli {
@@ -165,7 +166,9 @@ pub async fn spawn_testnet_node(
     )
     .await?;
 
-    let validator = init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number);
+    let (tx, rx) = tokio::sync::broadcast::channel(1);
+    let validator = init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number, rx);
+
     let network_handle = network.handle.clone();
 
     let pool_config = PoolConfig::default();

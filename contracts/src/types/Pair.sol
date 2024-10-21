@@ -7,23 +7,18 @@ import {RayMathLib} from "../libraries/RayMathLib.sol";
 import {
     PoolConfigStore, StoreKey, HASH_TO_STORE_KEY_SHIFT
 } from "../libraries/PoolConfigStore.sol";
-// TODO: Remove
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-import {console} from "forge-std/console.sol";
 
 type Pair is uint256;
 
-/// @dev
 type PairArray is uint256;
 
 using PairLib for Pair global;
 using PairLib for PairArray global;
 
 /// @author philogy <https://github.com/philogy>
+/// @dev Keeps track of pairs used in a given transaction, ensuring they've been initialized and are
+/// unique.
 library PairLib {
-    // TODO: Remove
-    using FormatLib for *;
-
     using RayMathLib for uint256;
 
     error OutOfOrderOrDuplicatePairs();

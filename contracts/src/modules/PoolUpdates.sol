@@ -28,6 +28,8 @@ import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
 /// @author philogy <https://github.com/philogy>
+/// @dev Top-level entry point for updating any state related to the underyling hooked Uniswap V4
+/// pools. Updates individual positions rewards, initiates swaps and reward distribution.
 abstract contract PoolUpdates is
     UniConsumer,
     GrowthOutsideUpdater,
@@ -115,6 +117,7 @@ abstract contract PoolUpdates is
         uint128 positionTotalLiquidity = UNI_V4.getPositionLiquidity(id, positionKey);
         uint256 rewards = growthInside.mulWad(positionTotalLiquidity) - position.pastRewards;
 
+        // Pay rewards to owner via uniswap delta => assumes that router is not malicious.
         if (rewards > 0) {
             UNI_V4.sync(key.currency0);
             Currency.unwrap(key.currency0).safeTransfer(address(UNI_V4), rewards);

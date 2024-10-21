@@ -2448,7 +2448,6 @@ interface PoolGate {
 pub mod PoolGate {
     use alloy::sol_types as alloy_sol_types;
 
-    use super::*;
     /// The creation / init bytecode of the contract.
     ///
     /// ```text

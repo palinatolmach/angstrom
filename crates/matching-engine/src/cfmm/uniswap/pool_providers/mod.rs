@@ -8,7 +8,7 @@ pub mod canonical_state_adapter;
 pub mod mock_block_stream;
 pub mod provider_adapter;
 
-pub trait PoolManagerProvider {
+pub trait PoolManagerProvider: Send + Sync {
     fn subscribe_blocks(&self) -> futures::stream::BoxStream<Option<u64>>;
     fn get_logs(
         &self,

@@ -1,403 +1,569 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::{Deref, DerefMut},
+    collections::{HashMap, HashSet},
     pin::Pin,
-    task::{Context, Poll},
+    sync::Arc,
+    task::{Context, Poll, Waker},
     time::Duration
 };
 
-use alloy_primitives::FixedBytes;
-use angstrom_types::consensus::{Commit, PreProposal};
-use futures::{ready, Future, FutureExt, Stream};
-use reth_primitives::B512;
-use tokio::task::AbortHandle;
-use tracing::warn;
+use alloy_primitives::BlockNumber;
+use angstrom_metrics::ConsensusMetricsWrapper;
+use angstrom_network::{manager::StromConsensusEvent, StromMessage};
+use angstrom_types::{
+    consensus::{Commit, PreProposal, Proposal},
+    orders::{OrderSet, PoolSolution},
+    sol_bindings::{
+        grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
+        rpc_orders::TopOfBlockOrder
+    }
+};
+use futures::{future::BoxFuture, Future, Stream};
+use matching_engine::MatchingManager;
+use order_pool::order_storage::OrderStorage;
+use reth_rpc_types::PeerId;
+use serde::{Deserialize, Serialize};
+use tokio::time::{self, Instant};
 
-use crate::ConsensusState;
+use crate::{AngstromValidator, Signer};
 
-#[allow(dead_code)]
-pub enum Leader {
-    ThisNode(B512),
-    OtherNode(B512)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct BidSubmission {
+    pub block_height:  BlockNumber,
+    // this is used mostly for early messages
+    pub pre_proposals: HashSet<PreProposal>
 }
 
-impl Leader {
-    #[allow(dead_code)]
-    pub fn address(&self) -> FixedBytes<64> {
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct BidAggregation {
+    pub block_height:  BlockNumber,
+    pub pre_proposals: HashSet<PreProposal>
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Finalization {
+    pub block_height:  BlockNumber,
+    pub pre_proposals: HashSet<PreProposal>,
+    pub proposal:      Option<Proposal>
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ConsensusState {
+    BidSubmission(BidSubmission),
+    BidAggregation(BidAggregation),
+    Finalization(Finalization)
+}
+
+impl ConsensusState {
+    fn name(&self) -> &'static str {
         match self {
-            Self::ThisNode(a) => *a,
-            Self::OtherNode(a) => *a
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn is_me(&self) -> bool {
-        matches!(self, Self::ThisNode(_))
-    }
-}
-
-impl Default for Leader {
-    fn default() -> Self {
-        Self::ThisNode(FixedBytes::default())
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct RoundStateTimings {
-    pub accumulation: Duration,
-    pub preproposal:  Duration,
-    pub laggards:     Duration
-}
-
-impl RoundStateTimings {
-    pub fn new(acc_secs: u64, pp_secs: u64, lag_secs: u64) -> Self {
-        Self {
-            accumulation: Duration::from_secs(acc_secs),
-            preproposal:  Duration::from_secs(pp_secs),
-            laggards:     Duration::from_secs(lag_secs)
+            Self::BidSubmission(_) => "BidSubmission",
+            Self::BidAggregation(_) => "BidAggregation",
+            Self::Finalization(_) => "Finalization"
         }
     }
 }
 
-/// The current state and subsequent actions that should be taken
-/// for such state in a given round. All state that this contains
-/// is transient to the given ethereum block height
-pub struct RoundState {
-    /// The current ethereum height
-    height:         u64,
-    /// Total number of nodes in the Angstrom network for this round
-    #[allow(dead_code)]
-    node_count:     u64,
-    two_thirds:     usize,
-    /// Who is the current leader
-    #[allow(dead_code)]
-    leader:         Leader,
-    /// Round timing configuration
-    timings:        RoundStateTimings,
-    /// the current action we should be taking at the moment of
-    /// time for this height
-    current_state:  RoundAction,
-    /// Broadcast preproposals seen for this round
-    pre_proposals:  HashMap<FixedBytes<64>, PreProposal>,
-    /// Proposal build task for this round - to be aborted if we start a new
-    /// round
-    proposal_build: Option<AbortHandle>,
-    /// Broadcast commit messages seen for this round
-    commits:        HashMap<FixedBytes<64>, Commit>
+async fn build_proposal(pre_proposals: Vec<PreProposal>) -> Result<Vec<PoolSolution>, String> {
+    let matcher = MatchingManager {};
+    matcher.build_proposal(pre_proposals).await
 }
 
-impl Drop for RoundState {
-    fn drop(&mut self) {
-        // Abort any outstanding proposal build if we have one
-        if let Some(ref h) = self.proposal_build {
-            h.abort();
-        }
-    }
+pub struct RoundStateMachine {
+    current_state:          ConsensusState,
+    signer:                 Signer,
+    round_leader:           PeerId,
+    validators:             Vec<AngstromValidator>,
+    order_storage:          Arc<OrderStorage>,
+    initial_state_duration: Duration,
+    metrics:                ConsensusMetricsWrapper,
+    transition_future:      Option<BoxFuture<'static, ConsensusState>>,
+    initial_state_timer:    Option<Pin<Box<time::Sleep>>>,
+    waker:                  Option<Waker>
 }
 
-impl RoundState {
+impl RoundStateMachine {
     pub fn new(
-        height: u64,
-        node_count: u64,
-        leader: Leader,
-        timings: Option<RoundStateTimings>
+        block_height: BlockNumber,
+        order_storage: Arc<OrderStorage>,
+        signer: Signer,
+        round_leader: PeerId,
+        validators: Vec<AngstromValidator>,
+        metrics: ConsensusMetricsWrapper,
+        initial_state_duration: Option<Duration>
     ) -> Self {
-        // Quick and dirty way for us to find our threshold, can be cleaned up later
-        let two_thirds: usize = ((2 * node_count) / 3) as usize;
-        let timings = timings.unwrap_or_default();
-        let current_state = RoundAction::new(&timings);
+        let initial_state_duration =
+            initial_state_duration.unwrap_or_else(|| Duration::from_secs(3));
+        let timer = Box::pin(time::sleep(initial_state_duration));
+
         Self {
-            leader,
-            timings,
-            height,
-            node_count,
-            two_thirds,
-            current_state,
-            pre_proposals: HashMap::new(),
-            proposal_build: None,
-            commits: HashMap::new()
+            current_state: Self::initial_state(block_height),
+            round_leader,
+            validators,
+            initial_state_duration,
+            order_storage,
+            signer,
+            metrics,
+            transition_future: None,
+            initial_state_timer: Some(timer),
+            waker: None
         }
     }
 
-    pub fn current_height(&self) -> u64 {
-        self.height
+    pub fn my_id(&self) -> PeerId {
+        self.signer.my_id
     }
 
-    pub fn is_leader(&self) -> bool {
-        matches!(self.leader, Leader::ThisNode(_))
+    pub fn is_leader(&self, node: PeerId) -> bool {
+        self.round_leader == node
     }
 
-    pub fn timings(&self) -> RoundStateTimings {
-        self.timings.clone()
+    pub fn i_am_leader(&self) -> bool {
+        self.is_leader(self.my_id())
     }
 
-    pub fn on_commit(&mut self, peer: FixedBytes<64>, commit: Commit) -> Result<(), String> {
-        match self.commits.entry(peer) {
-            Entry::Occupied(_) => Err("Received a second commit from host".to_owned()),
-            Entry::Vacant(v) => {
-                v.insert(commit);
-                Ok(())
+    pub fn has_quorum(&self, voters: usize) -> bool {
+        voters >= (self.validators.len() * 2) / 3 + 1
+    }
+
+    pub fn reset_round(&mut self, block: BlockNumber, leader: PeerId) {
+        self.round_leader = leader;
+        self.current_state = Self::initial_state(block);
+        self.initial_state_timer = Some(Box::pin(time::sleep(self.initial_state_duration)));
+        self.transition_future = None;
+    }
+
+    pub fn initial_state(block_height: BlockNumber) -> ConsensusState {
+        ConsensusState::BidSubmission(BidSubmission { block_height, ..Default::default() })
+    }
+
+    pub fn my_pre_proposal(&self, pre_proposals: &HashSet<PreProposal>) -> Option<StromMessage> {
+        pre_proposals
+            .iter()
+            .find(|p| p.source == self.my_id())
+            .cloned()
+            .map(StromMessage::PrePropose)
+    }
+
+    /// Invariants:
+    ///  * won't be called with messages with payload from ourselves
+    ///  * won't be called with messages for non-current block height
+    ///
+    /// Returns:
+    ///   In general we do not want to return an updated message for broadcast.
+    ///   However, during bid aggregation, we need to tell the rest of the
+    ///   network what our updated pre_proposal is, so when it's time for the
+    ///   leader to propose, it needs to see an agreement on the ToB and RoB
+    pub fn on_strom_message(&mut self, strom_msg: StromConsensusEvent) -> Option<StromMessage> {
+        let current_state = self.current_state.clone();
+        let new_state = match current_state {
+            ConsensusState::BidSubmission(bid_submission) => {
+                let (updated_submission, new_state) =
+                    self.handle_strom_msg_in_submission(bid_submission, strom_msg);
+                self.current_state = ConsensusState::BidSubmission(updated_submission);
+                new_state
             }
-        }
-    }
-
-    /// Used when we start building a proposal to register the proposal build
-    /// task and cancel any outstanding build task for this round (which
-    /// should never happen, but hey...)
-    pub fn on_proposal(&mut self, build_handle: AbortHandle) {
-        if let Some(h) = self.proposal_build.replace(build_handle) {
-            warn!("Second proposal build launched for eth height {}", self.height);
-            h.abort()
-        }
-    }
-
-    pub fn on_pre_propose(
-        &mut self,
-        peer: FixedBytes<64>,
-        pre_propose: PreProposal
-    ) -> Result<(), String> {
-        // TODO:  Validate this prepropose
-        if !matches!(
-            self.current_state,
-            RoundAction::PrePropose(_) | RoundAction::PreProposeLaggards(_)
-        ) {
-            return Err("PreProposal received early".to_owned())
-        }
-        match self.pre_proposals.entry(peer) {
-            Entry::Occupied(_) => return Err("Received a second prepropose from host".to_owned()),
-            Entry::Vacant(v) => {
-                v.insert(pre_propose);
+            ConsensusState::BidAggregation(bid_aggregation) => {
+                let (updated_aggregation, new_state) =
+                    self.handle_strom_msg_in_aggregation(bid_aggregation, strom_msg);
+                self.current_state = ConsensusState::BidAggregation(updated_aggregation);
+                new_state
             }
+            ConsensusState::Finalization(finalization) => {
+                let (updated_finalization, new_state) =
+                    self.handle_strom_msg_in_finalization(finalization, strom_msg);
+                self.current_state = ConsensusState::Finalization(updated_finalization);
+                new_state
+            }
+        };
+
+        if let Some(new_state) = new_state {
+            self.force_transition(new_state);
         }
-        // Check if we have enough preproposals to trigger our state change
-        if self.pre_proposals.len() >= self.two_thirds {
-            self.current_state =
-                RoundAction::PreProposeLaggards(Timeout::new(self.timings.laggards));
+
+        // send the updated pre-proposal with the new orders
+        if let ConsensusState::BidAggregation(BidAggregation { pre_proposals, .. }) =
+            &self.current_state
+        {
+            return self.my_pre_proposal(pre_proposals);
         }
-        Ok(())
+
+        None
     }
 
-    pub fn get_preproposals(&self) -> Vec<PreProposal> {
-        self.pre_proposals.values().cloned().collect()
+    fn handle_strom_msg_in_submission(
+        &self,
+        mut bid_submission: BidSubmission,
+        strom_msg: StromConsensusEvent
+    ) -> (BidSubmission, Option<ConsensusState>) {
+        match strom_msg {
+            // we are lagging, we should transition to bid aggregation
+            StromConsensusEvent::PreProposal(msg_sender, pre_proposal) => {
+                let PreProposal {
+                    block_height: pre_proposal_height,
+                    source: pre_proposal_sender,
+                    ..
+                } = pre_proposal;
+                if !pre_proposal.is_valid() {
+                    tracing::warn!(
+                        %msg_sender,
+                        %bid_submission.block_height,
+                        %pre_proposal_sender,
+                        %pre_proposal_height,
+                        "received pre_proposal with invalid signature",
+                    );
+                    return (bid_submission, None);
+                }
+                bid_submission.pre_proposals.insert(pre_proposal.clone());
+
+                let bid_aggregation = self.generate_bid_aggregation(bid_submission.clone());
+
+                bid_submission.pre_proposals = bid_aggregation.pre_proposals.clone();
+
+                // TODO: do we want to skip bid aggregation if we have quorum here ?
+                (bid_submission, Some(ConsensusState::BidAggregation(bid_aggregation)))
+            }
+            StromConsensusEvent::Proposal(msg_sender, proposal) => {
+                let Proposal {
+                    block_height: proposal_block_height, source: proposal_sender, ..
+                } = proposal;
+                // TODO: we got an invalid proposal; start slashing ?
+                if !proposal.is_valid() || !self.is_leader(proposal_sender) {
+                    return (bid_submission, None);
+                }
+
+                // we are following and lagging a lot
+                if !self.i_am_leader() {
+                    let pre_proposals = bid_submission.pre_proposals.clone();
+                    return (
+                        bid_submission,
+                        Some(ConsensusState::Finalization(Finalization {
+                            block_height: proposal_block_height,
+                            proposal: Some(proposal),
+                            pre_proposals
+                        }))
+                    );
+                }
+
+                // that should not be possible. it means we got our own proposal from another
+                // node, while we are in bid submission state
+                panic!(
+                    "Message sender: {}, Proposal block height: {}, Proposal source: {}, Current \
+                     state {}, something is terribly wrong",
+                    msg_sender,
+                    proposal_block_height,
+                    proposal_sender,
+                    self.current_state.name()
+                );
+            }
+            // TODO: this could be used  by the leader to gossip the 2/3 + 1 pre_proposals that were
+            // used for the bundle
+            StromConsensusEvent::Commit(..) => (bid_submission, None)
+        }
+    }
+
+    fn generate_bid_aggregation(&self, bid_submission: BidSubmission) -> BidAggregation {
+        let BidSubmission { block_height, pre_proposals } = bid_submission;
+        let OrderSet { limit, searcher } = self.order_storage.get_all_orders();
+        let mut pre_proposals = pre_proposals.clone();
+
+        let pre_proposal =
+            self.generate_our_merged_pre_proposal(block_height, limit, searcher, &pre_proposals);
+        pre_proposals.insert(pre_proposal);
+
+        BidAggregation { block_height, pre_proposals }
+    }
+
+    fn generate_our_merged_pre_proposal(
+        &self,
+        block_height: BlockNumber,
+        limit: Vec<OrderWithStorageData<GroupedVanillaOrder>>,
+        searcher: Vec<OrderWithStorageData<TopOfBlockOrder>>,
+        pre_proposals: &HashSet<PreProposal>
+    ) -> PreProposal {
+        let merged_limit_orders = self.merge_limit_orders(
+            pre_proposals
+                .iter()
+                .flat_map(|p| p.limit.clone())
+                .chain(limit)
+                .collect()
+        );
+
+        let merged_searcher_orders = self.merge_searcher_orders(
+            pre_proposals
+                .iter()
+                .flat_map(|p| p.searcher.clone())
+                .chain(searcher)
+                .collect()
+        );
+
+        PreProposal::generate_pre_proposal(
+            block_height,
+            self.my_id(),
+            merged_limit_orders,
+            merged_searcher_orders,
+            &self.signer.key
+        )
+    }
+
+    fn handle_strom_msg_in_aggregation(
+        &self,
+        mut bid_aggregation: BidAggregation,
+        strom_msg: StromConsensusEvent
+    ) -> (BidAggregation, Option<ConsensusState>) {
+        match strom_msg {
+            StromConsensusEvent::PreProposal(_, pre_proposal) => {
+                let PreProposal { block_height, .. } = pre_proposal;
+
+                if !pre_proposal.is_valid() {
+                    return (bid_aggregation, None);
+                }
+
+                bid_aggregation.pre_proposals.insert(pre_proposal.clone());
+
+                // TODO: make it prettier
+                let self_proposal = self.generate_our_merged_pre_proposal(
+                    block_height,
+                    Vec::new(),
+                    Vec::new(),
+                    &bid_aggregation.pre_proposals
+                );
+
+                bid_aggregation.pre_proposals.insert(self_proposal);
+
+                if self.has_quorum(bid_aggregation.pre_proposals.len()) {
+                    return (
+                        bid_aggregation.clone(),
+                        Some(ConsensusState::Finalization(Finalization {
+                            block_height,
+                            proposal: None,
+                            pre_proposals: bid_aggregation.pre_proposals
+                        }))
+                    );
+                }
+
+                (bid_aggregation, None)
+            }
+            StromConsensusEvent::Proposal(msg_sender, proposal) => {
+                let Proposal {
+                    block_height: proposal_block_height, source: proposal_sender, ..
+                } = proposal;
+                // TODO: we got an invalid proposal; start slashing ?
+                if !proposal.is_valid() || !self.is_leader(proposal_sender) {
+                    return (bid_aggregation, None);
+                }
+
+                // we are following and lagging a bit
+                if !self.i_am_leader() {
+                    let pre_proposals = bid_aggregation.pre_proposals.clone();
+                    return (
+                        bid_aggregation,
+                        Some(ConsensusState::Finalization(Finalization {
+                            block_height: proposal_block_height,
+                            proposal: Some(proposal),
+                            pre_proposals
+                        }))
+                    );
+                }
+
+                // that should not be possible. it means we got our own proposal from another
+                // node, while we are in bid aggregation state
+                panic!(
+                    "Message sender: {}, Proposal block height: {}, Proposal source: {}, Current \
+                     state {}, something is terribly wrong",
+                    msg_sender,
+                    proposal_block_height,
+                    proposal_sender,
+                    self.current_state.name()
+                );
+            }
+            // TODO: used to broadcast after the bundle submission
+            StromConsensusEvent::Commit(..) => (bid_aggregation, None),
+            _ => (bid_aggregation, None)
+        }
+    }
+
+    fn handle_strom_msg_in_finalization(
+        &self,
+        mut finalization: Finalization,
+        strom_msg: StromConsensusEvent
+    ) -> (Finalization, Option<ConsensusState>) {
+        match strom_msg {
+            StromConsensusEvent::PreProposal(msg_sender, pre_proposal) => {
+                let PreProposal {
+                    block_height: pre_proposal_height,
+                    source: pre_proposal_sender,
+                    ..
+                } = pre_proposal;
+                if !pre_proposal.is_valid() {
+                    tracing::warn!(
+                        %msg_sender,
+                        %finalization.block_height,
+                        %pre_proposal_sender,
+                        %pre_proposal_height,
+                        "received pre_proposal with invalid signature",
+                    );
+                    return (finalization, None);
+                }
+
+                finalization.pre_proposals.insert(pre_proposal);
+
+                if !self.i_am_leader() {
+                    // if we are not leader wait for Ethereum to restart us
+                    return (finalization, None);
+                }
+
+                if !self.has_quorum(finalization.pre_proposals.len()) {
+                    return (finalization, None);
+                }
+
+                (finalization, None)
+            }
+            StromConsensusEvent::Proposal(msg_sender, proposal) => {
+                let Proposal {
+                    block_height: proposal_block_height, source: proposal_sender, ..
+                } = proposal;
+                // TODO: we got an invalid proposal; start slashing ?
+                if !proposal.is_valid() || !self.is_leader(proposal_sender) {
+                    return (finalization, None);
+                }
+
+                // we are following and lagging a bit
+                if !self.i_am_leader() {
+                    let pre_proposals = finalization.pre_proposals.clone();
+                    return (
+                        finalization,
+                        Some(ConsensusState::Finalization(Finalization {
+                            block_height: proposal_block_height,
+                            proposal: Some(proposal),
+                            pre_proposals
+                        }))
+                    );
+                }
+
+                // that should not be possible. it means we got our own proposal from another
+                // node, while we are in bid aggregation state
+                panic!(
+                    "Message sender: {}, Proposal block height: {}, Proposal source: {}, Current \
+                     state {}, something is terribly wrong",
+                    msg_sender,
+                    proposal_block_height,
+                    proposal_sender,
+                    self.current_state.name()
+                );
+            }
+            // TODO: this could be used  by the leader to gossip the 2/3 + 1 pre_proposals that were
+            // used for the bundle
+            StromConsensusEvent::Commit(..) => (finalization, None)
+        }
+    }
+
+    fn merge_limit_orders(
+        &self,
+        left_limit: Vec<OrderWithStorageData<GroupedVanillaOrder>>
+    ) -> Vec<OrderWithStorageData<GroupedVanillaOrder>> {
+        let mut unique_limit_per_pool: HashMap<_, HashSet<GroupedVanillaOrder>> = HashMap::new();
+
+        for order_with_data in left_limit {
+            unique_limit_per_pool
+                .entry(order_with_data.pool_id)
+                .or_insert_with(HashSet::new)
+                .insert(order_with_data.order.clone());
+        }
+
+        unique_limit_per_pool
+            .into_iter()
+            .flat_map(|(pool_id, orders)| {
+                orders.into_iter().map(move |order| OrderWithStorageData {
+                    pool_id,
+                    order,
+                    ..Default::default()
+                })
+            })
+            .collect()
+    }
+
+    fn merge_searcher_orders(
+        &self,
+        left_searcher: Vec<OrderWithStorageData<TopOfBlockOrder>>
+    ) -> Vec<OrderWithStorageData<TopOfBlockOrder>> {
+        let mut top_searcher_per_pool: HashMap<_, OrderWithStorageData<TopOfBlockOrder>> =
+            HashMap::new();
+        for order_with_data in left_searcher {
+            let pool_id = order_with_data.pool_id;
+            top_searcher_per_pool
+                .entry(pool_id)
+                .and_modify(|existing_order| {
+                    if order_with_data.tob_reward > existing_order.tob_reward {
+                        *existing_order = order_with_data.clone();
+                    }
+                })
+                .or_insert(order_with_data);
+        }
+        top_searcher_per_pool.into_values().collect()
+    }
+
+    fn force_transition(&mut self, mut new_state: ConsensusState) {
+        let from_state = self.current_state.clone();
+        let signer = self.signer.clone();
+
+        self.transition_future = Some(Box::pin(async move {
+            if let (
+                ConsensusState::BidAggregation(BidAggregation {
+                    block_height: pre_proposal_height,
+                    pre_proposals
+                }),
+                ConsensusState::Finalization(ref mut finalization)
+            ) = (from_state, &mut new_state)
+            {
+                let pre_proposals: Vec<PreProposal> = pre_proposals.iter().cloned().collect();
+                // TODO: maybe spawn a new thread here, since proposal building might be comp
+                // expensive
+                let solutions = build_proposal(pre_proposals.clone()).await.unwrap();
+                let proposal = signer.sign_proposal(pre_proposal_height, pre_proposals, solutions);
+
+                finalization.proposal = Some(proposal);
+
+                // TODO: submit the proposal/bundle to the chain
+                // Ethereum.submit(proposal).await
+            }
+            new_state
+        }));
+
+        // wake up the task to ensure poll_next is called
+        if let Some(waker) = &self.waker {
+            waker.wake_by_ref();
+        }
     }
 }
 
-impl Stream for RoundState {
+impl Stream for RoundStateMachine {
     type Item = ConsensusState;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<ConsensusState>> {
-        let acc_timeout = self.timings.accumulation;
-        let pre_timeout = self.timings.preproposal;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
 
-        let newstate =
-            ready!(Pin::new(&mut self.current_state).poll_timeout(cx, acc_timeout, pre_timeout));
+        this.waker = Some(cx.waker().clone());
 
-        let new_global_state = newstate.to_global();
-        self.current_state = newstate;
-        Poll::Ready(Some(new_global_state))
-
-        // let is_leader = self.is_leader.clone();
-        // if let Poll::Ready((new_action, msg)) = Pin::new(&mut
-        // self.current_state)     .should_transition(cx,
-        // GlobalStateContext { is_leader })     .map(|(round_action,
-        // new_state, message)| {         self.consensus.
-        // update_state(new_state);         (round_action, message)
-        //     })
-        // {
-        //     self.current_state = new_action;
-        //     return_if!(msg => { is_some() } map(Poll::Ready));
-        // }
-
-        // Poll::Pending
-    }
-}
-
-#[repr(transparent)]
-pub struct Timeout(Pin<Box<dyn Future<Output = ()> + Send>>);
-
-impl Deref for Timeout {
-    type Target = Pin<Box<dyn Future<Output = ()> + Send>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Timeout {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Timeout {
-    pub fn new(timeout: Duration) -> Self {
-        Timeout(Box::pin(async move { tokio::time::sleep(timeout).await }))
-    }
-}
-
-impl std::fmt::Debug for Timeout {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Timeout")
-    }
-}
-
-/// Enum describing the current state of our consensus round
-#[derive(Debug)]
-pub enum RoundAction {
-    /// In OrderAccumulation state, orders for the current block are being
-    /// collected.  The timeout represents the amount of time before we
-    /// transition to PrePropose state.
-    OrderAccumulation(Timeout),
-    /// In PrePropose state, we assemble our accumulated orders and broadcast a
-    /// PreProposal.  All nodes then collect PreProposal messages.  The timeout
-    /// represents the amount of time that the leader node will wait to receive
-    /// PreProposal messages from 2/3rds of the nodes in the network
-    PrePropose(Timeout),
-    /// Once the leader node has received PreProposals for 2/3rds of the nodes,
-    /// we will wait a little bit to see if additional PrePropose messages make
-    /// their way to us.  The timeout represents the amount of time the leader
-    /// will wait to receive these extra messages.
-    PreProposeLaggards(Timeout),
-    /// Trigger proposal generation for the leader, otherwise go right back to
-    /// OrderAccumulation (for the next block tho?)
-    Propose
-}
-
-impl RoundAction {
-    pub fn new(config: &RoundStateTimings) -> Self {
-        Self::OrderAccumulation(Timeout::new(config.accumulation))
-    }
-
-    pub fn to_global(&self) -> ConsensusState {
-        match self {
-            Self::OrderAccumulation(_) => ConsensusState::OrderAccumulation,
-            Self::PrePropose(_) => ConsensusState::PreProposal,
-            Self::PreProposeLaggards(_) => ConsensusState::PreProposalLaggards,
-            Self::Propose => ConsensusState::Proposal
+        if let Some(ref mut future) = this.transition_future {
+            return match future.as_mut().poll(cx) {
+                Poll::Ready(new_state) => Poll::Ready(Some(new_state)),
+                Poll::Pending => Poll::Pending
+            };
         }
-    }
 
-    pub fn poll_timeout(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        acc_timeout: Duration,
-        pre_timeout: Duration
-    ) -> Poll<RoundAction> {
-        match &mut *self {
-            Self::OrderAccumulation(t) => t
-                .poll_unpin(cx)
-                .map(|_| Self::PrePropose(Timeout::new(pre_timeout))),
-            Self::PrePropose(t) => t.poll_unpin(cx).map(|_| Self::Propose),
-            Self::PreProposeLaggards(t) => t.poll_unpin(cx).map(|_| Self::Propose),
-            Self::Propose => Poll::Ready(Self::OrderAccumulation(Timeout::new(acc_timeout)))
+        if let Some(ref mut timer) = this.initial_state_timer {
+            if timer.as_mut().poll(cx).is_ready() {
+                // if the timer ran out and we are not in bid submission, something curious
+                // happened
+                if let ConsensusState::BidSubmission(ref bid_submission) = this.current_state {
+                    let bid_aggregation = this.generate_bid_aggregation(bid_submission.clone());
+                    this.transition_future =
+                        Some(Box::pin(async { ConsensusState::BidAggregation(bid_aggregation) }));
+                    this.initial_state_timer = None;
+                }
+            }
         }
-    }
-}
 
-// impl StateTransition for RoundAction {
-//     fn should_transition(
-//         mut self: Pin<&mut Self>,
-//         cx: &mut Context<'_>,
-//         global_state: GlobalStateContext
-//     ) -> Poll<(RoundAction, ConsensusState, Option<RoundStateMessage>)> {
-//         match &mut *self {
-//             RoundAction::OrderAccumulation(p) =>
-// Pin::new(p).should_transition(cx, global_state),
-// RoundAction::PrePropose(p) => Pin::new(p).should_transition(cx,
-// global_state),             RoundAction::Propose(p) =>
-// Pin::new(p).should_transition(cx, global_state)
-// RoundAction::Commit(p) => Pin::new(p).should_transition(cx, global_state),
-//             RoundAction::Submit(p) => Pin::new(p).should_transition(cx,
-// global_state),             RoundAction::Completed(p) =>
-// Pin::new(p).should_transition(cx, global_state)         }
-//     }
-// }
-
-#[cfg(test)]
-mod tests {
-    use alloy_primitives::FixedBytes;
-    use testing_tools::type_generator::consensus::preproposal::PreproposalBuilder;
-    use tokio_stream::StreamExt;
-
-    use super::*;
-
-    #[test]
-    fn can_be_constructed() {
-        RoundState::new(100, 100, super::Leader::ThisNode(FixedBytes::random()), None);
-    }
-
-    #[tokio::test]
-    async fn states_progress_properly() {
-        let mut state =
-            RoundState::new(100, 100, super::Leader::ThisNode(FixedBytes::random()), None);
-        assert!(
-            matches!(state.current_state, RoundAction::OrderAccumulation(_)),
-            "Didn't start in OrderAccumulation state"
-        );
-
-        // Step to PreProposal state
-        let new_state = state.next().await;
-        assert!(
-            matches!(new_state, Some(ConsensusState::PreProposal)),
-            "Didn't emit global PreProposal state"
-        );
-        assert!(
-            matches!(state.current_state, RoundAction::PrePropose(_)),
-            "Didn't set to internal PreProposal state"
-        );
-
-        // Step to Proposal state - skip PreProposalLaggards
-        let new_state = state.next().await;
-        assert!(
-            matches!(new_state, Some(ConsensusState::Proposal)),
-            "Didn't emit global Proposal state"
-        );
-        assert!(
-            matches!(state.current_state, RoundAction::Propose),
-            "Didn't set to internal Proposal state"
-        );
-
-        // Back to OrderAccumulation
-        let new_state = state.next().await;
-        assert!(
-            matches!(new_state, Some(ConsensusState::OrderAccumulation)),
-            "Didn't emit global OrderAccumulation state"
-        );
-        assert!(
-            matches!(state.current_state, RoundAction::OrderAccumulation(_)),
-            "Didn't set to internal OrderAccumulation state"
-        );
-    }
-
-    #[test]
-    fn hits_preproposal_laggard_state() {
-        // Make our round state
-        let mut state =
-            RoundState::new(100, 3, super::Leader::ThisNode(FixedBytes::random()), None);
-        // Set it to PrePropose state
-        state.current_state = RoundAction::PrePropose(Timeout::new(Duration::default()));
-        // One preproposal is not enough
-        let pp1 = PreproposalBuilder::new()
-            .order_count(20)
-            .for_random_pools(1)
-            .for_block(100)
-            .build();
-        state.on_pre_propose(FixedBytes::random(), pp1).unwrap();
-        assert!(
-            matches!(state.current_state, RoundAction::PrePropose(_)),
-            "Not still in PrePropose state"
-        );
-        // But then two should cause us to have 2/3rds of the network so we should be
-        // good
-        let pp2 = PreproposalBuilder::new()
-            .order_count(20)
-            .for_random_pools(1)
-            .for_block(100)
-            .build();
-        state.on_pre_propose(FixedBytes::random(), pp2).unwrap();
-        assert!(
-            matches!(state.current_state, RoundAction::PreProposeLaggards(_)),
-            "Didn't jump to Laggards state"
-        );
+        Poll::Pending
     }
 }

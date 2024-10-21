@@ -16,7 +16,7 @@ use amms::{
     },
     errors::{AMMError, EventLogError}
 };
-use reth_primitives::Log;
+use reth_primitives::{BlockNumber, Log};
 use thiserror::Error;
 use uniswap_v3_math::{
     error::UniswapV3MathError,
@@ -82,6 +82,18 @@ impl EnhancedUniswapV3Pool {
         }
     }
 
+    pub async fn initialize<T: Transport + Clone, N: Network>(
+        &mut self,
+        block_number: Option<BlockNumber>,
+        ws_provider: Arc<impl Provider<T, N>>
+    ) -> Result<(), AMMError> {
+        tracing::info!(block_number = block_number, "loading old pool");
+        self.populate_data(block_number, ws_provider.clone())
+            .await?;
+        self.sync_ticks(block_number, ws_provider.clone()).await?;
+        Ok(())
+    }
+
     pub fn set_sim_swap_sync(&mut self, sync_swap_with_sim: bool) {
         self.sync_swap_with_sim = sync_swap_with_sim;
     }
@@ -141,23 +153,6 @@ impl EnhancedUniswapV3Pool {
         Ok((tick_data, result.blockNumber))
     }
 
-    pub async fn initialize<T, N, P>(
-        &mut self,
-        block_number: Option<u64>,
-        provider: Arc<P>
-    ) -> Result<(), AMMError>
-    where
-        T: Transport + Clone,
-        N: Network,
-        P: Provider<T, N>
-    {
-        self.populate_data(block_number, provider).await
-    }
-
-    pub fn is_initialized(&self) -> bool {
-        self.token_a != Address::default() && self.token_b != Address::default()
-    }
-
     pub async fn sync_ticks<T, N, P>(
         &mut self,
         block_number: Option<u64>,
@@ -168,7 +163,7 @@ impl EnhancedUniswapV3Pool {
         N: Network,
         P: Provider<T, N>
     {
-        if !self.is_initialized() {
+        if !self.data_is_populated() {
             return Err(AMMError::PoolDataError);
         }
 
@@ -595,7 +590,7 @@ mod test {
     ) -> EnhancedUniswapV3Pool {
         let address = address!("88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640");
         let mut pool = EnhancedUniswapV3Pool::new(address, ticks_per_side);
-        pool.initialize(Some(block_number), provider.clone())
+        pool.populate_data(Some(block_number), provider.clone())
             .await
             .unwrap();
         pool

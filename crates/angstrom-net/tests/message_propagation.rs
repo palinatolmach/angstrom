@@ -112,8 +112,7 @@ async fn test_broadcast_consensus_propagation() {
         let delay_seconds = 6;
         let res = tokio::time::timeout(
             Duration::from_secs(delay_seconds),
-            testnet
-                .send_consensus_broadcast(angstrom_network::StromMessage::Commit(Box::new(commit)))
+            testnet.send_consensus_broadcast(angstrom_network::StromMessage::Commit(commit))
         )
         .await;
         assert_eq!(
@@ -168,8 +167,7 @@ async fn test_consensus_propagation() {
         let commit = generate_random_commit(&sk);
         let res = tokio::time::timeout(
             Duration::from_secs(1),
-            testnet
-                .send_consensus_message(angstrom_network::StromMessage::Commit(Box::new(commit)))
+            testnet.send_consensus_message(angstrom_network::StromMessage::Commit(commit))
         )
         .await;
         assert_eq!(res, Ok(true), "failed to receive and react to commit within 1 second");

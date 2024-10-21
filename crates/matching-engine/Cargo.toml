@@ -22,6 +22,7 @@ eyre.workspace = true
 futures.workspace = true
 futures-util.workspace = true
 uniswap_v3_math.workspace = true
+itertools.workspace = true
 malachite = "0.4.0"
 malachite-q = "0.4.0"
 pade.workspace = true

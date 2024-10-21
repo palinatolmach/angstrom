@@ -1,4 +1,7 @@
-use std::ops::{BitAnd, BitOr};
+use std::{
+    hash::Hash,
+    ops::{BitAnd, BitOr}
+};
 
 use anyhow::Error;
 use bitmaps::Bitmap;
@@ -20,6 +23,12 @@ pub struct BLSSignature {
     validators_included: Bitmap<128>,
     /// BLS aggregated signature data
     aggregate_signature: MultiSignature<Bls12381G1Impl>
+}
+impl Hash for BLSSignature {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.validators_included.hash(state);
+        self.aggregate_signature.as_raw_value().hash(state);
+    }
 }
 
 impl BLSSignature {

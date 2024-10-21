@@ -4,10 +4,13 @@ use std::{
     task::Poll
 };
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, BlockNumber, B256};
 use angstrom_types::primitive::NewInitializedPool;
 use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
 use futures::{Future, StreamExt};
+use matching_engine::cfmm::uniswap::{
+    pool_manager::UniswapPoolManager, pool_providers::PoolManagerProvider
+};
 use tokio::runtime::Handle;
 
 use super::{
@@ -23,25 +26,27 @@ use crate::{
     order::{state::account::UserAccountProcessor, OrderValidation}
 };
 
-pub struct OrderValidator<DB, Pools, Fetch> {
+pub struct OrderValidator<DB, Pools, Fetch, Provider> {
     sim:          SimValidation<DB>,
-    state:        StateValidation<Pools, Fetch>,
+    state:        StateValidation<Pools, Fetch, Provider>,
     thread_pool:  KeySplitThreadpool<UserAddress, Pin<Box<dyn Future<Output = ()> + Send>>, Handle>,
     block_number: Arc<AtomicU64>
 }
 
-impl<DB, Pools, Fetch> OrderValidator<DB, Pools, Fetch>
+impl<DB, Pools, Fetch, Provider> OrderValidator<DB, Pools, Fetch, Provider>
 where
     DB: Unpin + Clone + 'static + revm::DatabaseRef + Sync + Send,
     <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + 'static,
-    Fetch: StateFetchUtils + Sync + 'static
+    Fetch: StateFetchUtils + Sync + 'static,
+    Provider: PoolManagerProvider + Sync + 'static
 {
     pub fn new(
         sim: SimValidation<DB>,
         block_number: Arc<AtomicU64>,
         pools: Pools,
         fetch: Fetch,
+        pool_manager: UniswapPoolManager<Provider>,
         thread_pool: KeySplitThreadpool<
             UserAddress,
             Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -53,21 +58,22 @@ where
                 block_number.load(std::sync::atomic::Ordering::SeqCst),
                 fetch
             ),
-            pools
+            pools,
+            pool_manager
         );
         Self { state, sim, block_number, thread_pool }
     }
 
     pub fn on_new_block(
         &mut self,
-        number: u64,
+        block_number: BlockNumber,
         completed_orders: Vec<B256>,
         address_changes: Vec<Address>
     ) {
         self.block_number
-            .store(number, std::sync::atomic::Ordering::SeqCst);
+            .store(block_number, std::sync::atomic::Ordering::SeqCst);
         self.state
-            .new_block(number, completed_orders, address_changes);
+            .new_block(block_number, completed_orders, address_changes);
     }
 
     /// only checks state
@@ -107,12 +113,13 @@ where
     }
 }
 
-impl<DB, Pools, Fetch> Future for OrderValidator<DB, Pools, Fetch>
+impl<DB, Pools, Fetch, Provider> Future for OrderValidator<DB, Pools, Fetch, Provider>
 where
     DB: Clone + Unpin + 'static + revm::DatabaseRef + Send + Sync,
     <DB as revm::DatabaseRef>::Error: Send + Sync,
     Pools: PoolsTracker + Sync + Unpin + 'static,
-    Fetch: StateFetchUtils + Sync + Unpin + 'static
+    Fetch: StateFetchUtils + Sync + Unpin + 'static,
+    Provider: PoolManagerProvider + Sync + Unpin + 'static
 {
     type Output = ();
 

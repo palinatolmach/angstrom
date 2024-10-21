@@ -22,6 +22,7 @@ pade.workspace = true
 anyhow.workspace = true
 hex-literal.workspace = true
 angstrom-types.workspace = true
+matching-engine.workspace = true
 
 derive_more = "0.99.17"
 

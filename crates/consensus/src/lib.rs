@@ -1,7 +1,3 @@
-mod cache;
-mod contract;
-mod evidence;
-mod global;
 mod leader_selection;
 mod manager;
 mod round;
@@ -11,10 +7,11 @@ use std::pin::Pin;
 
 use angstrom_types::consensus::{Commit, PreProposal, Proposal};
 use futures::Stream;
-pub use global::*;
 pub use leader_selection::AngstromValidator;
 pub use manager::*;
+pub use round::ConsensusState;
 pub use signer::*;
+
 #[derive(Debug, Clone)]
 pub enum ConsensusMessage {
     /// Start/Cycle the consensus process as a new block has begun

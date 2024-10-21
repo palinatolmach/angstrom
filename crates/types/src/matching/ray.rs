@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{const_2_192, MatchingPrice, SqrtPriceX96};
 use crate::matching::const_1e27;
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ray(U256);
 
 impl Deref for Ray {

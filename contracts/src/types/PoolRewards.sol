@@ -6,9 +6,6 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-
 /// @dev Should accomodate all possible tick values.
 uint256 constant REWARD_GROWTH_SIZE = 16777216;
 
@@ -20,9 +17,8 @@ struct PoolRewards {
 using PoolRewardsLib for PoolRewards global;
 
 /// @author philogy <https://github.com/philogy>
+/// @dev Computes and maintains global LP rewards.
 library PoolRewardsLib {
-    using FormatLib for *;
-
     using IUniV4 for IPoolManager;
     using TickLib for uint256;
     using TickLib for int24;

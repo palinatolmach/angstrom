@@ -11,7 +11,6 @@ members = [
   "crates/order-pool",
   "crates/rpc",
   "crates/eth/",
-  "crates/submission",
   "testing-tools",
   "crates/matching-engine",
   "crates/pade",
@@ -128,6 +127,7 @@ reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", version = "1
 alloy = { version = "0.3", features = [
   "full",
   "rlp",
+  "eip712",
   "node-bindings",
   "rpc-types-debug",
   "rpc-types-trace",

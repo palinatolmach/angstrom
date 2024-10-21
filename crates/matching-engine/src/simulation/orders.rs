@@ -60,7 +60,8 @@ pub fn order_distribution(
                     location:        angstrom_types::orders::OrderLocation::Limit
                 },
                 pool_id: FixedBytes::default(),
-                valid_block: 0
+                valid_block: 0,
+                tob_reward: U256::ZERO
             }
         })
         .take(number)
