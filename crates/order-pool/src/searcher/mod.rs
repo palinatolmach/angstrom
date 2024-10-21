@@ -63,7 +63,7 @@ impl SearcherPool {
     }
 
     pub fn get_all_pool_ids(&self) -> Vec<PoolId> {
-        self.searcher_orders.keys().cloned().into_iter().collect()
+        self.searcher_orders.keys().cloned().collect()
     }
 
     pub fn get_orders_for_pool(

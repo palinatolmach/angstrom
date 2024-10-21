@@ -138,7 +138,7 @@ impl OrderStorage {
             .lock()
             .expect("lock poisoned")
             .get_orders_for_pool(pool_id)
-            .expect(&format!("pool {} does not exist", pool_id))
+            .unwrap_or_else(|| panic!("pool {} does not exist", pool_id))
             .iter()
             .max_by_key(|order| order.tob_reward)
             .cloned()
