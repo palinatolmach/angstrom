@@ -1,7 +1,10 @@
-use std::collections::{HashMap, HashSet};
-
 // use bincode::{config::standard, encode_to_vec, Decode, Encode};
-use alloy::primitives::keccak256;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{Hash, Hasher}
+};
+
+use alloy::primitives::{keccak256, BlockNumber};
 use bytes::Bytes;
 use reth_network_peers::PeerId;
 use secp256k1::SecretKey;
@@ -16,42 +19,39 @@ use crate::{
     }
 };
 
-// #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, RlpDecodable,
-// RlpEncodable)] pub struct PoolOrders {
-//     pub pool:         PoolId,
-//     pub searcher_bid: TopOfBlockOrder,
-//     pub orders:       Vec<OrderWithStorageData<GroupedVanillaOrder>>
-// }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct PreProposal {
-    pub ethereum_height: u64,
-    pub source:          PeerId,
-    pub limit:           Vec<OrderWithStorageData<GroupedVanillaOrder>>,
-    pub searcher:        Vec<OrderWithStorageData<TopOfBlockOrder>>,
+    pub block_height: BlockNumber,
+    pub source:       PeerId,
+    // TODO: this really should be HashMap<PoolId, GroupedVanillaOrder>
+    pub limit:        Vec<OrderWithStorageData<GroupedVanillaOrder>>,
+    // TODO: this really should be another type with HashMap<PoolId, {order, tob_reward}>
+    pub searcher:     Vec<OrderWithStorageData<TopOfBlockOrder>>,
+    // if the below changes from a BLS to EcDSA,
+    // i.e. deterministic to non-deterministic signature, the Hash, PartialEq, Eq should be updated
     /// The signature is over the ethereum height as well as the limit and
     /// searcher sets
-    pub signature:       Signature
+    pub signature:    Signature
 }
 
 impl PreProposal {
+    fn sign_payload(sk: &SecretKey, payload: Vec<u8>) -> Signature {
+        let hash = keccak256(payload);
+        let sig = reth_primitives::sign_message(sk.secret_bytes().into(), hash).unwrap();
+        Signature(sig)
+    }
+
     pub fn generate_pre_proposal(
-        ethereum_height: u64,
+        ethereum_height: BlockNumber,
         source: PeerId,
         limit: Vec<OrderWithStorageData<GroupedVanillaOrder>>,
         searcher: Vec<OrderWithStorageData<TopOfBlockOrder>>,
         sk: &SecretKey
     ) -> Self {
-        let mut buf = Vec::new();
+        let payload = Self::serialize_payload(&ethereum_height, &limit, &searcher);
+        let signature = Self::sign_payload(sk, payload);
 
-        buf.extend(bincode::serialize(&ethereum_height).unwrap());
-        buf.extend(bincode::serialize(&limit).unwrap());
-        buf.extend(bincode::serialize(&searcher).unwrap());
-
-        let hash = keccak256(buf);
-        let sig = reth_primitives::sign_message(sk.secret_bytes().into(), hash).unwrap();
-
-        Self { limit, source, searcher, ethereum_height, signature: Signature(sig) }
+        Self { limit, source, searcher, block_height: ethereum_height, signature }
     }
 
     pub fn new(
@@ -64,7 +64,7 @@ impl PreProposal {
         Self::generate_pre_proposal(ethereum_height, source, limit, searcher, sk)
     }
 
-    pub fn validate(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         let hash = keccak256(self.payload());
         let Ok(source) = self.signature.recover_signer_full_public_key(hash) else {
             return false;
@@ -72,12 +72,20 @@ impl PreProposal {
         source == self.source
     }
 
-    fn payload(&self) -> Bytes {
+    fn serialize_payload(
+        block_height: &BlockNumber,
+        limit: &Vec<OrderWithStorageData<GroupedVanillaOrder>>,
+        searcher: &Vec<OrderWithStorageData<TopOfBlockOrder>>
+    ) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.extend(bincode::serialize(&self.ethereum_height).unwrap());
-        buf.extend(bincode::serialize(&self.limit).unwrap());
-        buf.extend(bincode::serialize(&self.searcher).unwrap());
-        Bytes::from_iter(buf)
+        buf.extend(bincode::serialize(block_height).unwrap());
+        buf.extend(bincode::serialize(limit).unwrap());
+        buf.extend(bincode::serialize(searcher).unwrap());
+        buf
+    }
+
+    fn payload(&self) -> Bytes {
+        Bytes::from(Self::serialize_payload(&self.block_height, &self.limit, &self.searcher))
     }
 
     pub fn orders_by_pool_id(
@@ -128,6 +136,6 @@ mod tests {
         let preproposal =
             PreProposal::generate_pre_proposal(ethereum_height, source, limit, searcher, &sk);
 
-        assert!(preproposal.validate(), "Unable to validate self");
+        assert!(preproposal.is_valid(), "Unable to validate self");
     }
 }

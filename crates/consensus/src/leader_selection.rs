@@ -117,9 +117,9 @@ impl WeightedRoundRobin {
     }
 
     pub fn choose_proposer(&mut self, block_number: BlockNumber) -> Option<PeerId> {
-        let cycle_count = (block_number - self.block_number) as usize;
+        let rounds_to_catchup = (block_number - self.block_number) as usize;
         let mut leader = None;
-        for _ in 0..cycle_count {
+        for _ in 0..rounds_to_catchup {
             self.center_priorities();
             self.scale_priorities();
             leader = Some(self.proposer_selection());

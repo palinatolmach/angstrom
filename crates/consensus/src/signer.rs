@@ -1,4 +1,4 @@
-use alloy_primitives::{FixedBytes, B512};
+use alloy_primitives::{BlockNumber, FixedBytes, B512};
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
     orders::PoolSolution,
@@ -42,7 +42,7 @@ impl Signer {
 
     pub fn sign_proposal(
         &self,
-        ethereum_block: u64,
+        ethereum_block: BlockNumber,
         preproposals: Vec<PreProposal>,
         solutions: Vec<PoolSolution>
     ) -> Proposal {
@@ -52,15 +52,6 @@ impl Signer {
     pub fn sign_commit(&self, proposal: &Proposal) -> Commit {
         Commit::from_proposal(proposal, &self.bls_key)
     }
-
-    // #[allow(dead_code)]
-    // pub fn sign_pre_propose(
-    //     &self,
-    //     _ethereum_block: u64,
-    //     _orders: Vec<PoolOrders>
-    // ) -> eyre::Result<PreProposal> {
-    //     todo!()
-    // }
 
     pub fn is_us(&self, _addr: &B512) -> bool {
         todo!("change key to proper")

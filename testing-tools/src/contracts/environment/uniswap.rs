@@ -4,8 +4,8 @@ use alloy::primitives::{
 };
 use angstrom_types::{
     contract_bindings::{
-        poolgate::PoolGate::{self, PoolGateInstance},
-        poolmanager::PoolManager
+        pool_gate::PoolGate::{self, PoolGateInstance},
+        pool_manager::PoolManager
     },
     matching::SqrtPriceX96,
     primitive::PoolKey
@@ -110,12 +110,6 @@ where
         tick_spacing: I24,
         pool_fee: U24
     ) -> eyre::Result<PoolKey> {
-        self.pool_gate()
-            .initializePool(asset0, asset1, *initial_price, 0)
-            .from(self.controller())
-            .run_safe()
-            .await?;
-
         let pool_key = PoolKey {
             currency0:   asset0,
             currency1:   asset1,

@@ -18,6 +18,7 @@ use testnet::{
     ported_reth_testnet_network::{connect_all_peers, StromPeer},
     rpc_state_provider::RpcStateProviderFactory
 };
+use tokio::sync::broadcast;
 use tracing::{span, Instrument, Level};
 use validation::{common::BlockStateProviderFactory, init_validation};
 
@@ -165,8 +166,15 @@ pub async fn spawn_testnet_node(
     )
     .await?;
 
-    let validator =
-        init_validation(rpc_wrapper, CACHE_VALIDATION_SIZE, block_number, Some(contract_address));
+    let (tx, rx) = tokio::sync::broadcast::channel(1);
+    let validator = init_validation(
+        rpc_wrapper,
+        CACHE_VALIDATION_SIZE,
+        block_number,
+        Some(contract_address),
+        rx
+    );
+
     let network_handle = network.handle.clone();
 
     let pool_config = PoolConfig::default();

@@ -32,19 +32,19 @@ impl MockConsensusEventHandle {
 
     pub fn prepropose(&self, peer: PeerId, proposal: PreProposal) {
         self.tx
-            .send(StromConsensusEvent::PrePropose(peer, proposal))
+            .send(StromConsensusEvent::PreProposal(peer, proposal))
             .expect("Failed to send proposal");
     }
 
     pub fn propose(&self, peer: PeerId, proposal: Proposal) {
         self.tx
-            .send(StromConsensusEvent::Propose(peer, proposal))
+            .send(StromConsensusEvent::Proposal(peer, proposal))
             .expect("Failed to send proposal");
     }
 
     pub fn commit(&self, peer: PeerId, commit: Commit) {
         self.tx
-            .send(StromConsensusEvent::Commit(peer, Box::new(commit)))
+            .send(StromConsensusEvent::Commit(peer, commit))
             .expect("Failed to send commit message")
     }
 

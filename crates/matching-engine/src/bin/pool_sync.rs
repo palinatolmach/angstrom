@@ -32,20 +32,20 @@ async fn main() -> eyre::Result<()> {
     let to_block = block_number + 100;
     let address = address!("88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640");
     let mut pool = EnhancedUniswapV3Pool::new(address, ticks_per_side);
-    pool.set_sim_swap_sync(true);
     tracing::info!(block_number = block_number, "loading old pool");
     pool.initialize(Some(block_number), ws_provider.clone())
         .await?;
-    pool.sync_ticks(Some(block_number), ws_provider.clone())
-        .await?;
+    pool.set_sim_swap_sync(true);
+
     let state_change_buffer = 1;
 
     let mock_block_stream =
         Arc::new(MockBlockStream::new(ws_provider.clone(), from_block, to_block));
-    let state_space_manager =
-        UniswapPoolManager::new(pool, block_number, state_change_buffer, mock_block_stream);
+    let pools = vec![pool];
+    let uniswap_pool_manager =
+        UniswapPoolManager::new(pools, block_number, state_change_buffer, mock_block_stream);
 
-    let (mut rx, _join_handles) = state_space_manager.subscribe_state_changes().await?;
+    let (mut rx, _join_handles) = uniswap_pool_manager.subscribe_state_changes().await?;
 
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sigint = signal(SignalKind::interrupt())?;
@@ -55,12 +55,10 @@ async fn main() -> eyre::Result<()> {
             _ = sigterm.recv() => break,
             _ = sigint.recv() => break,
             state_changes = rx.recv() => {
-                if let Some(changes) = state_changes {
-                   let pool_guard = state_space_manager.pool().await;
-                    let changes_block_number = changes.1;
+                if let Some((address, changes_block_number)) = state_changes {
+                   let pool_guard = uniswap_pool_manager.pool(&address).await.unwrap();
                     let mut fresh_pool = EnhancedUniswapV3Pool::new(address, ticks_per_side);
                     fresh_pool.initialize(Some(changes_block_number), ws_provider.clone()).await?;
-                    fresh_pool.sync_ticks(Some(changes_block_number), ws_provider.clone()).await?;
 
                     // Compare the new pool with the old pool
                     compare_pools(&pool_guard, &fresh_pool, changes_block_number);

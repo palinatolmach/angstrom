@@ -11,7 +11,6 @@ members = [
   "crates/order-pool",
   "crates/rpc",
   "crates/eth/",
-  "crates/submission",
   "testing-tools",
   "crates/matching-engine",
   "crates/pade",
@@ -31,7 +30,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.80"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/SorellaLabs/angstrom"
 repository = "https://github.com/SorellaLabs/angstrom"
@@ -128,6 +127,7 @@ reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", version = "1
 alloy = { version = "0.3", features = [
   "full",
   "rlp",
+  "eip712",
   "node-bindings",
   "rpc-types-debug",
   "rpc-types-trace",

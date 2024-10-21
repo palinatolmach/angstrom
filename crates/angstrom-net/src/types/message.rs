@@ -115,7 +115,7 @@ pub enum StromMessage {
     /// Consensus
     PrePropose(PreProposal),
     Propose(Proposal),
-    Commit(Box<Commit>),
+    Commit(Commit),
 
     /// Propagation messages that broadcast new orders to all peers
     PropagatePooledOrders(Vec<AllOrders>)

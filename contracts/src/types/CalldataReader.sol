@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-import {LibString} from "solady/src/utils/LibString.sol";
-
-/// @dev Represents a calldata offset.
+/// @dev Represents a raw calldata offset.
 type CalldataReader is uint256;
 
 using CalldataReaderLib for CalldataReader global;
@@ -37,9 +33,6 @@ function le(CalldataReader a, CalldataReader b) pure returns (bool) {
 
 /// @author philogy <https://github.com/philogy>
 library CalldataReaderLib {
-    using FormatLib for *;
-    using LibString for *;
-
     error ReaderNotAtEnd();
 
     function from(bytes calldata data) internal pure returns (CalldataReader reader) {

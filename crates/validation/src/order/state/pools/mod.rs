@@ -10,7 +10,7 @@ use super::config::ValidationConfig;
 
 pub mod angstrom_pools;
 
-pub trait PoolsTracker: Clone + Send + Unpin {
+pub trait PoolsTracker: Send + Unpin {
     /// Returns None if no pool is found
     fn fetch_pool_info_for_order<O: RawPoolOrder>(&self, order: &O) -> Option<UserOrderPoolInfo>;
 
@@ -26,7 +26,6 @@ pub struct UserOrderPoolInfo {
     pub pool_id: PoolId
 }
 
-#[derive(Clone)]
 /// keeps track of all valid pools and the mappings of asset id to pool id
 pub struct AngstromPoolsTracker {
     /// TODO: we can most likely flatten this but will circle back
@@ -70,7 +69,7 @@ impl PoolsTracker for AngstromPoolsTracker {
 
 #[cfg(test)]
 pub mod pool_tracker_mock {
-    use alloy::primitives::{Address, FixedBytes};
+    use alloy::primitives::Address;
     use angstrom_types::primitive::PoolId;
     use dashmap::DashMap;
 

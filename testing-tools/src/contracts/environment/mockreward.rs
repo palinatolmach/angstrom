@@ -4,8 +4,8 @@ use alloy::primitives::{
 };
 use angstrom_types::{
     contract_bindings::{
-        mockrewardsmanager::MockRewardsManager::MockRewardsManagerInstance,
-        poolgate::PoolGate::PoolGateInstance
+        mock_rewards_manager::MockRewardsManager::MockRewardsManagerInstance,
+        pool_gate::PoolGate::PoolGateInstance
     },
     matching::{uniswap::PoolSnapshot, SqrtPriceX96},
     primitive::PoolKey

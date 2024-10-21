@@ -71,7 +71,8 @@ pub fn generate_limit_order(
         is_valid: true,
         order_id,
         pool_id,
-        valid_block
+        valid_block,
+        tob_reward: U256::ZERO
     }
 }
 
@@ -104,7 +105,8 @@ pub fn generate_top_of_block_order(
         is_valid: true,
         order_id,
         pool_id,
-        valid_block
+        valid_block,
+        tob_reward: U256::ZERO
     }
 }
 
@@ -225,7 +227,8 @@ pub fn generate_order_distribution(
                 is_currently_valid: true,
                 order_id,
                 pool_id,
-                valid_block
+                valid_block,
+                tob_reward: U256::ZERO,
             }
         })
         .take(order_count)

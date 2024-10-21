@@ -1,6 +1,6 @@
 //! keeps track of account state for orders
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, BlockNumber, B256, U256};
 use angstrom_types::{
     orders::OrderId,
     sol_bindings::{ext::RawPoolOrder, grouped_orders::OrderWithStorageData}
@@ -24,7 +24,7 @@ pub struct UserAccountProcessor<S> {
 }
 
 impl<S: StateFetchUtils> UserAccountProcessor<S> {
-    pub fn new(current_block: u64, fetch_utils: S) -> Self {
+    pub fn new(current_block: BlockNumber, fetch_utils: S) -> Self {
         let user_accounts = UserAccounts::new(current_block);
         Self { fetch_utils, user_accounts }
     }
@@ -140,7 +140,8 @@ pub trait StorageWithData: RawPoolOrder {
             valid_block: block,
             order_id: OrderId::from_all_orders(&self, pool_info.pool_id),
             invalidates,
-            order: self
+            order: self,
+            tob_reward: U256::ZERO
         }
     }
 }

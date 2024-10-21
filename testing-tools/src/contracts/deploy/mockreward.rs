@@ -3,7 +3,7 @@ use alloy::{
     primitives::{Address, U160},
     sol_types::SolValue
 };
-use angstrom_types::contract_bindings::mockrewardsmanager::MockRewardsManager;
+use angstrom_types::contract_bindings::mock_rewards_manager::MockRewardsManager;
 
 use super::{mine_address, DEFAULT_CREATE2_FACTORY};
 

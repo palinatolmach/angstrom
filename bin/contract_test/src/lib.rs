@@ -5,7 +5,7 @@ use alloy::{
     providers::{builder, IpcConnect},
     signers::local::PrivateKeySigner
 };
-use angstrom_types::contract_bindings::poolmanager::PoolManager;
+use angstrom_types::contract_bindings::pool_manager::PoolManager;
 
 type SpawnedProvider = alloy::providers::fillers::FillProvider<
     alloy::providers::fillers::JoinFill<

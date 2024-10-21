@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use angstrom_types::contract_bindings::mintablemockerc20::MintableMockERC20;
+use angstrom_types::contract_bindings::mintable_mock_erc_20::MintableMockERC20;
 
 pub async fn mint_token_pair<T, N, P>(provider: &P) -> (Address, Address)
 where
