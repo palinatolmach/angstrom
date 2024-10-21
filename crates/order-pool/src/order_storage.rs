@@ -130,7 +130,10 @@ impl OrderStorage {
             });
     }
 
-    pub fn top_tob_order_for_pool(&self, pool_id: &PoolId) -> Option<OrderWithStorageData<TopOfBlockOrder>> {
+    pub fn top_tob_order_for_pool(
+        &self,
+        pool_id: &PoolId
+    ) -> Option<OrderWithStorageData<TopOfBlockOrder>> {
         self.searcher_orders
             .lock()
             .expect("lock poisoned")

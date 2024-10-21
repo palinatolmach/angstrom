@@ -75,7 +75,7 @@ pub fn new_reward(
     println!("Total cost: {}\tquantityIn: {}", pricevec.input(), tob.quantityIn);
     let total_cost: u128 = pricevec.input().saturating_to();
     if total_cost > tob.quantityIn {
-        return Err(eyre!("Not enough input to cover the transaction"));
+        return Err(eyre!("Not enough input to cover the transaction"))
     }
     let leftover = tob.quantityIn - total_cost;
     let donation = pricevec.donation(leftover);
@@ -264,10 +264,22 @@ pub fn calculate_reward(
 
 #[cfg(test)]
 mod test {
-    use alloy::primitives::Uint;
-    use angstrom_types::matching::{
-        uniswap::{LiqRange, PoolSnapshot, Quantity},
-        SqrtPriceX96
+    use alloy::{
+        primitives::{address, aliases::I24, Address, Bytes, Uint, U256},
+        providers::ProviderBuilder,
+        sol_types::SolValue
+    };
+    use angstrom_types::{
+        contract_bindings::{
+            angstrom::Angstrom::PoolKey,
+            mock_rewards_manager::MockRewardsManager::MockRewardsManagerInstance,
+            pool_manager::PoolManager
+        },
+        contract_payloads::tob::{Asset, MockContractMessage, PoolRewardsUpdate, RewardsUpdate},
+        matching::{
+            uniswap::{LiqRange, PoolSnapshot, Quantity},
+            SqrtPriceX96
+        }
     };
     use rand::thread_rng;
     use testing_tools::type_generator::orders::generate_top_of_block_order;

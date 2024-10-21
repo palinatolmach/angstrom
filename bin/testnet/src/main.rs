@@ -25,8 +25,8 @@ use validation::{common::BlockStateProviderFactory, init_validation};
 #[derive(Parser)]
 #[clap(about = "
 Angstrom Anvil Testnet.
-Anvil must be installed on the system in order to spin up the \
-                testnode. 
+Anvil must be installed on the system in order to spin up \
+                the testnode. 
 To install run `curl -L https://foundry.paradigm.xyz | bash`. then run foundryup to install anvil
     ")]
 struct Cli {

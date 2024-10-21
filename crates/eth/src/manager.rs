@@ -186,7 +186,7 @@ where
             .into_iter()
             .flat_map(|receipt| {
                 receipt.logs.iter().filter_map(|log| {
-                    contract_bindings::poolmanager::PoolManager::Initialize::decode_log(log, true)
+                    contract_bindings::pool_manager::PoolManager::Initialize::decode_log(log, true)
                         .map(Into::into)
                         .ok()
                 })

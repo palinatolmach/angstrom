@@ -86,11 +86,7 @@ impl<Pools: PoolsTracker, Fetch: StateFetchUtils, Provider: PoolManagerProvider 
             return OrderValidationResults::Invalid(order_hash)
         }
 
-        let Some(pool_info) = self
-            .pool_tacker
-            .read()
-            .fetch_pool_info_for_order(&order)
-        else {
+        let Some(pool_info) = self.pool_tacker.read().fetch_pool_info_for_order(&order) else {
             return OrderValidationResults::Invalid(order_hash)
         };
 

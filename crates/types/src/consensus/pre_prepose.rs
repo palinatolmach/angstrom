@@ -1,9 +1,9 @@
+// use bincode::{config::standard, encode_to_vec, Decode, Encode};
 use std::{
     collections::{HashMap, HashSet},
     hash::{Hash, Hasher}
 };
 
-// use bincode::{config::standard, encode_to_vec, Decode, Encode};
 use alloy::primitives::{keccak256, BlockNumber};
 use bytes::Bytes;
 use reth_network_peers::PeerId;

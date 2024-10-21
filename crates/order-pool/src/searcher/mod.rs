@@ -65,8 +65,14 @@ impl SearcherPool {
     pub fn get_all_pool_ids(&self) -> Vec<PoolId> {
         self.searcher_orders.keys().cloned().into_iter().collect()
     }
-    pub fn get_orders_for_pool(&self, pool_id: &PoolId) -> Option<Vec<OrderWithStorageData<TopOfBlockOrder>>> {
-        self.searcher_orders.get(pool_id).map(|pool| pool.get_all_orders())
+
+    pub fn get_orders_for_pool(
+        &self,
+        pool_id: &PoolId
+    ) -> Option<Vec<OrderWithStorageData<TopOfBlockOrder>>> {
+        self.searcher_orders
+            .get(pool_id)
+            .map(|pool| pool.get_all_orders())
     }
 
     pub fn get_all_orders(&self) -> Vec<OrderWithStorageData<TopOfBlockOrder>> {

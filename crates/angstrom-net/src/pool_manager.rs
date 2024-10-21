@@ -11,7 +11,9 @@ use std::{
 
 use angstrom_eth::manager::EthEvent;
 use angstrom_types::{
-    contract_bindings::poolmanager::PoolManager::{syncCall, PoolManagerCalls::updateDynamicLPFee},
+    contract_bindings::pool_manager::PoolManager::{
+        syncCall, PoolManagerCalls::updateDynamicLPFee
+    },
     orders::{OrderOrigin, OrderSet},
     primitive::Order,
     sol_bindings::{

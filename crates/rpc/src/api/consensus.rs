@@ -1,6 +1,7 @@
-use crate::types::subscriptions::ConsensusSubscriptionKind;
 use consensus::ConsensusState;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+
+use crate::types::subscriptions::ConsensusSubscriptionKind;
 
 #[cfg_attr(not(feature = "client"), rpc(server, namespace = "angstrom_consensus"))]
 #[cfg_attr(feature = "client", rpc(server, client, namespace = "angstrom_consensus"))]
