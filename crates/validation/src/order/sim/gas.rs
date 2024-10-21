@@ -165,7 +165,8 @@ where
         let (out, cache_db) = Self::execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Create;
             tx.caller = DEFAULT_FROM;
-            tx.data = angstrom_types::contract_bindings::poolmanager::PoolManager::BYTECODE.clone();
+            tx.data =
+                angstrom_types::contract_bindings::pool_manager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
         })?;
 

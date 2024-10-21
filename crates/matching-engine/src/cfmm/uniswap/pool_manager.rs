@@ -300,7 +300,7 @@ where
         )
     }
 
-    pub fn get_market_snapshot(&self, address: Address) -> Result<MarketSnapshot, Error> {
+    pub fn get_market_snapshot(&self, address: Address) -> Result<PoolSnapshot, Error> {
         let (ranges, price) = {
             let pool_lock = self
                 .blocking_pool(&address)

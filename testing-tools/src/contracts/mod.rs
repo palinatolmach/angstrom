@@ -6,6 +6,8 @@ use alloy::{
 use angstrom_types::contract_bindings::mock_rewards_manager::MockRewardsManager;
 use eyre::eyre;
 
+use crate::contracts::deploy::mine_address;
+
 pub mod anvil;
 pub mod deploy;
 pub mod environment;
@@ -19,31 +21,54 @@ pub trait DebugTransaction {
     async fn run_safe(self) -> eyre::Result<()>;
 }
 
-pub fn mine_address_with_factory(
-    factory: Option<Address>,
-    flags: U160,
-    mask: U160,
-    initcode: &Bytes
-) -> (Address, U256) {
-    let init_code_hash = keccak256(initcode);
-    let mut salt = U256::ZERO;
-    let create2_factory = factory.unwrap_or(CREATE2_FACTORY);
-    let mut counter: u128 = 0;
-    loop {
-        let target_address: Address = create2_factory.create2(B256::from(salt), init_code_hash);
-        let u_address: U160 = target_address.into();
-        if (u_address & mask) == flags {
-            break
-        }
-        salt += U256::from(1_u8);
-        counter += 1;
-        if counter > 100_000 {
-            panic!("We tried this too many times!")
+impl<T, P, D> DebugTransaction for CallBuilder<T, P, D>
+where
+    T: Clone + Send + Sync + alloy::transports::Transport,
+    P: alloy::providers::Provider<T>,
+    D: alloy::contract::CallDecoder
+{
+    async fn run_safe(self) -> eyre::Result<()> {
+        let receipt = self
+            .gas(30_000_000_u128)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+        if receipt.inner.status() {
+            Ok(())
+        } else {
+            // We can make this do a cool backtrace later
+            Err(eyre!("Transaction with hash {} failed", receipt.transaction_hash))
         }
     }
-    let final_address = create2_factory.create2(B256::from(salt), init_code_hash);
-    (final_address, salt)
 }
+
+// pub fn mine_address_with_factory(
+//     factory: Option<Address>,
+//     flags: U160,
+//     mask: U160,
+//
+//     initcode: &Bytes
+// ) -> (Address, U256) {
+//     let init_code_hash = keccak256(initcode);
+//     let mut salt = U256::ZERO;
+//     let create2_factory = factory.unwrap_or(CREATE2_FACTORY);
+//     let mut counter: u128 = 0;
+//     loop {
+//         let target_address: Address =
+// create2_factory.create2(B256::from(salt), init_code_hash);         let
+// u_address: U160 = target_address.into();         if (u_address & mask) ==
+// flags {             break
+//         }
+//         salt += U256::from(1_u8);
+//         counter += 1;
+//         if counter > 100_000 {
+//             panic!("We tried this too many times!")
+//         }
+//     }
+//     let final_address = create2_factory.create2(B256::from(salt),
+// init_code_hash);     (final_address, salt)
+// }
 
 pub async fn deploy_mock_rewards_manager<
     T: alloy::contract::private::Transport + ::core::clone::Clone,
