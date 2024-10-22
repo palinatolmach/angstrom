@@ -171,6 +171,7 @@ where
         })?;
 
         if !out.result.is_success() {
+            println!("{:?}", out.result);
             eyre::bail!("failed to deploy uniswap v4 pool manager");
         }
         let v4_address = Address::from_slice(out.result.output().unwrap());
