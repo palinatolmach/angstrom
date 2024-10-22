@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::{Anvil, AnvilInstance},
-    primitives::{address, keccak256, Address, TxKind, U256},
+    primitives::{address, keccak256, Address, TxKind, B256, U256},
     providers::{
         builder,
         fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
@@ -315,7 +315,6 @@ where
             eyre::bail!("failed to deploy angstrom");
         }
 
-
         // enable default from to call the angstrom contract.
         let (out, mut cache_db) = Self::execute_with_db(cache_db, |tx| {
             tx.transact_to = TxKind::Call(angstrom_address);
@@ -407,31 +406,6 @@ where
 
         Ok(inspector.into_gas_used())
     }
-}
-
-pub fn mine_address_with_factory(
-    factory: Address,
-    flags: U160,
-    mask: U160,
-    initcode: &Bytes
-) -> (Address, U256) {
-    let init_code_hash = keccak256(initcode);
-    let mut salt = U256::ZERO;
-    let mut counter: u128 = 0;
-    loop {
-        let target_address: Address = factory.create2(B256::from(salt), init_code_hash);
-        let u_address: U160 = target_address.into();
-        if (u_address & mask) == flags {
-            break
-        }
-        salt += U256::from(1_u8);
-        counter += 1;
-        if counter > 100_000 {
-            panic!("We tried this too many times!")
-        }
-    }
-    let final_address = factory.create2(B256::from(salt), init_code_hash);
-    (final_address, salt)
 }
 
 struct ConfiguredRevm<DB> {
