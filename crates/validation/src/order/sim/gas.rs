@@ -518,7 +518,10 @@ pub mod test {
         was estimated"
             )
         }
+        let total_gas = result.result.gas_used();
+        println!("{total_gas} -- total gas used");
         drop(evm);
+
         let gas_used = inspector.into_gas_used();
         // this is the expected codes.
         //  0002    60  PUSH1 0x40 (3) gas
