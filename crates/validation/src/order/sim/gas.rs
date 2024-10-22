@@ -145,7 +145,7 @@ where
             .with_env_with_handler_cfg(evm_handler)
             .modify_env(|env| {
                 env.cfg.disable_balance_check = true;
-                env.cfg.limit_contract_code_size = Some(usize::MAX -1);
+                env.cfg.limit_contract_code_size = Some(usize::MAX - 1);
                 env.cfg.disable_block_gas_limit = true;
                 env.cfg.disable_block_gas_limit = true;
             })
@@ -170,13 +170,17 @@ where
             tx.data =
                 angstrom_types::contract_bindings::pool_manager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
+            tx.nonce = Some(0);
         })?;
 
         if !out.result.is_success() {
             println!("{:?}", out.result);
             eyre::bail!("failed to deploy uniswap v4 pool manager");
         }
-        let v4_address = Address::from_slice(out.result.output().unwrap());
+
+        let v4_address = Address::from_slice(&keccak256((DEFAULT_FROM, 0).abi_encode())[12..]);
+
+        // let v4_address = Address::from_slice(out.result.output().unwrap());
 
         // deploy angstrom.
 
@@ -193,12 +197,14 @@ where
             tx.caller = DEFAULT_FROM;
             tx.data = data.into();
             tx.value = U256::from(0);
+            tx.nonce = Some(1);
         })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to deploy angstrom");
         }
-        let angstrom_address = Address::from_slice(out.result.output().unwrap());
+
+        let angstrom_address = Address::from_slice(&keccak256((DEFAULT_FROM, 1).abi_encode())[12..]);
 
         // enable default from to call the angstrom contract.
         let (out, mut cache_db) = Self::execute_with_db(cache_db, |tx| {
