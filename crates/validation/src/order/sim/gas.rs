@@ -270,8 +270,7 @@ where
                 angstrom_types::contract_bindings::pool_manager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
             tx.nonce = Some(0);
-        })
-        .unwrap();
+        })?;
 
         if !out.result.is_success() {
             println!("{:?}", out.result);
@@ -280,10 +279,7 @@ where
 
         let v4_address = Address::from_slice(&keccak256((DEFAULT_FROM, 0).abi_encode())[12..]);
 
-        // let v4_address = Address::from_slice(out.result.output().unwrap());
-
         // deploy angstrom.
-
         let mut angstrom_raw_bytecode =
             angstrom_types::contract_bindings::angstrom::Angstrom::BYTECODE.clone();
 
@@ -308,8 +304,7 @@ where
             tx.caller = DEFAULT_FROM;
             tx.data = final_mock_initcode.into();
             tx.value = U256::from(0);
-        })
-        .unwrap();
+        })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to deploy angstrom");
@@ -326,12 +321,12 @@ where
             .into();
 
             tx.value = U256::from(0);
-        })
-        .unwrap();
+        })?;
 
         if !out.result.is_success() {
             eyre::bail!("failed to set default from address as node on angstrom");
         }
+
         Ok(ConfiguredRevm { db: cache_db, angstrom: angstrom_address, uni_swap: v4_address })
     }
 
