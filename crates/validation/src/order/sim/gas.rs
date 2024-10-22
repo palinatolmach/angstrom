@@ -480,7 +480,9 @@ pub mod test {
                 .unwrap();
         }
 
-        let offsets = std::collections::HashMap::default();
+        let mut offsets = std::collections::HashMap::default();
+
+        offsets.insert(2, 7);
 
         let mut inspector = GasSimulationInspector::new(weth_contract, &offsets);
 
@@ -516,7 +518,13 @@ pub mod test {
         was estimated"
             )
         }
-
-        // Ok(inspector.into_gas_used())
+        let gas_used = inspector.into_gas_used();
+        // this is the expected codes.
+        //  0002    60  PUSH1 0x40 (3) gas
+        // 	0004    52  MSTORE (6)
+        // 	0005    60  PUSH1 0x04 (3)
+        // 	0007    36  CALLDATASIZE (2)
+        
+        assert_eq!(gas_used, 14);
     }
 }
