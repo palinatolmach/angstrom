@@ -24,6 +24,7 @@ impl<Provider> TokenPriceGenerator<Provider> {
     /// is a bit of a pain as we need todo a look-back in-order to grab last 5
     /// blocks.
     pub async fn new(
+        current_block: u64,
         active_pairs: Vec<PoolId>,
         uni: &UniswapPoolManager<Provider>
     ) -> eyre::Result<Self> {
@@ -32,7 +33,8 @@ impl<Provider> TokenPriceGenerator<Provider> {
 
     /// NOTE: assumes that the uniswap pool state transition has already
     /// occurred.
-    pub fn on_new_block(&mut self) {}
+    pub fn on_new_block(&mut self) {
+    }
 
     fn get_best_eth_pair(&self, token0: Address, token1: Address) -> PairsWithPrice {
         todo!()
