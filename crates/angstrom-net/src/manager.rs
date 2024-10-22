@@ -6,14 +6,15 @@ use std::{
 };
 
 use alloy::primitives::BlockNumber;
+use alloy_rpc_types::Block;
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
+    primitive::PeerId,
     sol_bindings::ext::RawPoolOrder
 };
 use futures::StreamExt;
 use reth_eth_wire::DisconnectReason;
 use reth_metrics::common::mpsc::UnboundedMeteredSender;
-use reth_rpc_types::{Block, PeerId};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;

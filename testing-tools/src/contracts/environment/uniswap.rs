@@ -1,14 +1,7 @@
-use alloy::primitives::{
-    aliases::{I24, U24},
-    Address, FixedBytes, U256
-};
-use angstrom_types::{
-    contract_bindings::{
-        pool_gate::PoolGate::{self, PoolGateInstance},
-        pool_manager::PoolManager
-    },
-    matching::SqrtPriceX96,
-    primitive::PoolKey
+use alloy::primitives::{aliases::I24, Address, FixedBytes, U256};
+use angstrom_types::contract_bindings::{
+    pool_gate::PoolGate::{self, PoolGateInstance},
+    pool_manager::PoolManager
 };
 use tracing::debug;
 
@@ -18,14 +11,6 @@ use crate::contracts::DebugTransaction;
 pub trait TestUniswapEnv: TestAnvilEnvironment {
     fn pool_manager(&self) -> Address;
     fn pool_gate(&self) -> Address;
-    async fn create_pool(
-        &self,
-        asset0: Address,
-        asset1: Address,
-        initial_price: SqrtPriceX96,
-        tick_spacing: I24,
-        pool_fee: U24
-    ) -> eyre::Result<PoolKey>;
     async fn add_liquidity_position(
         &self,
         asset0: Address,
@@ -100,25 +85,6 @@ where
 
     fn pool_manager(&self) -> Address {
         self.pool_manager
-    }
-
-    async fn create_pool(
-        &self,
-        asset0: Address,
-        asset1: Address,
-        initial_price: SqrtPriceX96,
-        tick_spacing: I24,
-        pool_fee: U24
-    ) -> eyre::Result<PoolKey> {
-        let pool_key = PoolKey {
-            currency0:   asset0,
-            currency1:   asset1,
-            fee:         pool_fee,
-            tickSpacing: tick_spacing,
-            hooks:       Address::default()
-        };
-
-        Ok(pool_key)
     }
 
     async fn add_liquidity_position(

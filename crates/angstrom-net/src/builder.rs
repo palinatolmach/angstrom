@@ -2,12 +2,12 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use alloy::primitives::{Address, FixedBytes};
 use alloy_chains::Chain;
+use angstrom_types::primitive::PeerId;
 use futures::FutureExt;
 use parking_lot::RwLock;
 use reth_metrics::common::mpsc::{MeteredPollSender, UnboundedMeteredSender};
-use reth_primitives::{alloy_primitives::FixedBytes, Address};
-use reth_rpc_types::PeerId;
 use reth_tasks::TaskSpawner;
 use secp256k1::SecretKey;
 use tokio::sync::mpsc::Receiver;

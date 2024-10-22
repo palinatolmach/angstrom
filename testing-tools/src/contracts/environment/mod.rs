@@ -6,6 +6,7 @@ use tracing::debug;
 use super::anvil::AnvilWalletRpc;
 use crate::contracts::anvil::spawn_anvil;
 
+pub mod angstrom;
 pub mod mockreward;
 pub mod uniswap;
 

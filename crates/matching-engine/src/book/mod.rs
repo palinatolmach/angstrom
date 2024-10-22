@@ -5,7 +5,7 @@ use angstrom_types::{
     primitive::PoolId,
     sol_bindings::grouped_orders::{GroupedVanillaOrder, OrderWithStorageData}
 };
-use order::{OrderCoordinate, OrderDirection};
+use order::OrderCoordinate;
 
 use self::sort::SortStrategy;
 
@@ -52,7 +52,7 @@ impl OrderBook {
         self.amm.as_ref()
     }
 
-    pub fn find_coordinate(&self, coord: &OrderCoordinate) -> Option<(OrderDirection, usize)> {
+    pub fn find_coordinate(&self, coord: &OrderCoordinate) -> Option<(bool, usize)> {
         let OrderCoordinate { book, order } = coord;
         if *book != self.id {
             return None;
@@ -62,19 +62,19 @@ impl OrderBook {
 
     /// Given an OrderID, find the order with the matching ID and return an
     /// Option, `None` if not found, otherwise we return a tuple containing the
-    /// order's direction and its index in the various order arrays
-    pub fn find_order(&self, id: OrderId) -> Option<(OrderDirection, usize)> {
+    /// order's direction (is_bid) and its index in the various order arrays
+    pub fn find_order(&self, id: OrderId) -> Option<(bool, usize)> {
         self.bids
             .iter()
             .enumerate()
             .find(|(_, b)| b.order_id == id)
-            .map(|(i, _)| (OrderDirection::Bid, i))
+            .map(|(i, _)| (true, i))
             .or_else(|| {
                 self.asks
                     .iter()
                     .enumerate()
                     .find(|(_, b)| b.order_id == id)
-                    .map(|(i, _)| (OrderDirection::Ask, i))
+                    .map(|(i, _)| (false, i))
             })
     }
 }

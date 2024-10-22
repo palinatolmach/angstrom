@@ -6,7 +6,7 @@ use std::{
 };
 
 use alloy_primitives::BlockNumber;
-use reth_rpc_types::PeerId;
+use angstrom_types::primitive::PeerId;
 
 const ROUND_ROBIN_CACHE: &str = "./";
 

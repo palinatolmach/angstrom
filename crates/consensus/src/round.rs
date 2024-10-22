@@ -12,6 +12,7 @@ use angstrom_network::{manager::StromConsensusEvent, StromMessage};
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
     orders::{OrderSet, PoolSolution},
+    primitive::PeerId,
     sol_bindings::{
         grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
         rpc_orders::TopOfBlockOrder
@@ -20,7 +21,6 @@ use angstrom_types::{
 use futures::{future::BoxFuture, Future, Stream};
 use matching_engine::MatchingManager;
 use order_pool::order_storage::OrderStorage;
-use reth_rpc_types::PeerId;
 use serde::{Deserialize, Serialize};
 use tokio::time::{self, Instant};
 

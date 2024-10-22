@@ -12,15 +12,14 @@ use angstrom_network::{manager::StromConsensusEvent, Peer, StromMessage, StromNe
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
     contract_payloads::angstrom::TopOfBlockOrder,
-    orders::PoolSolution
+    orders::PoolSolution,
+    primitive::PeerId
 };
 use futures::{FutureExt, Stream, StreamExt};
 use matching_engine::MatchingManager;
 use order_pool::{order_storage::OrderStorage, timer::async_time_fn};
 use reth_metrics::common::mpsc::UnboundedMeteredReceiver;
-use reth_primitives::transaction::WithEncoded;
 use reth_provider::{CanonStateNotification, CanonStateNotifications};
-use reth_rpc_types::{beacon::relay::Validator, PeerId};
 use reth_tasks::TaskSpawner;
 use serde::__private::ser::FlatMapSerializeStructVariantAsMapValue;
 use serde_json::error::Category::Data;

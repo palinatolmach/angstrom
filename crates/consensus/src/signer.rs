@@ -2,10 +2,9 @@ use alloy_primitives::{BlockNumber, FixedBytes, B512};
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
     orders::PoolSolution,
-    primitive::BLSValidatorID
+    primitive::{BLSValidatorID, PeerId}
 };
 use blsful::{Bls12381G1Impl, SecretKey as BlsSecretKey};
-use reth_rpc_types::PeerId;
 use secp256k1::{rand::thread_rng, SecretKey};
 
 /// The Signer deals with verifying external signatures as well as

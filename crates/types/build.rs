@@ -1,4 +1,4 @@
-use std::{io::Write, os::unix::process::ExitStatusExt, path::PathBuf, process::Command};
+use std::{io::Write, os::unix::process::ExitStatusExt, process::Command};
 
 use convert_case::{Case, Casing};
 
@@ -16,11 +16,11 @@ const WANTED_CONTRACTS: [&str; 5] = [
 
 // builds the contracts crate. then goes and generates bindings on this
 fn main() {
-    let this_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let base_dir = workspace_dir();
 
-    let mut base_dir = PathBuf::from(this_dir.clone());
-    base_dir.pop();
-    base_dir.pop();
+    let binding = base_dir.clone();
+    let this_dir = binding.to_str().unwrap();
+    //panic!("{this_dir}");
 
     let mut contract_dir = base_dir.clone();
     contract_dir.push(CONTRACT_LOCATION);
@@ -55,6 +55,8 @@ fn main() {
             Some((raw, path.to_str()?.to_owned()))
         })
         .map(|(name, path_of_contracts)| {
+            let path_of_contracts = path_of_contracts.replace(&this_dir, "../..");
+
             let mod_name = name.clone().to_case(Case::Snake);
             format!(
                 r#"#[rustfmt::skip]
@@ -71,13 +73,27 @@ pub mod {mod_name} {{
         })
         .collect::<Vec<_>>();
 
+    // panic!("{this_dir}/crates/types{BINDINGS_PATH}");
+
     let mut f = std::fs::File::options()
         .write(true)
         .truncate(true)
-        .open(format!("/{this_dir}{BINDINGS_PATH}"))
+        .open(format!("{this_dir}/crates/types{BINDINGS_PATH}"))
         .unwrap();
 
     for contract_build in sol_macro_invocation {
         writeln!(&mut f, "{}", contract_build).expect("failed to write sol macro to contract");
     }
+}
+
+pub fn workspace_dir() -> std::path::PathBuf {
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = std::path::Path::new(std::str::from_utf8(&output).unwrap().trim());
+    cargo_path.parent().unwrap().to_path_buf()
 }

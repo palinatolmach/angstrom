@@ -3,10 +3,9 @@ use std::{
     sync::{atomic::AtomicU64, Arc}
 };
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256, U256};
 use angstrom_types::sol_bindings::{ext::RawPoolOrder, RespendAvoidanceMethod};
 use dashmap::DashMap;
-use reth_primitives::{B256, U256};
 
 use crate::order::state::{db_state_utils::StateFetchUtils, pools::UserOrderPoolInfo};
 

@@ -1,6 +1,10 @@
 use std::{collections::HashSet, net::SocketAddr, pin::Pin};
 
-use alloy::rlp::BytesMut;
+use alloy::{
+    primitives::{keccak256, Address},
+    rlp::BytesMut
+};
+use angstrom_types::primitive::PeerId;
 use futures::{stream::Empty, Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
@@ -11,8 +15,6 @@ use reth_network::{
     protocol::{ConnectionHandler, OnNotSupported},
     Direction
 };
-use reth_primitives::{keccak256, Address};
-use reth_rpc_types::PeerId;
 use tokio::{
     sync::mpsc,
     time::{Duration, Instant}

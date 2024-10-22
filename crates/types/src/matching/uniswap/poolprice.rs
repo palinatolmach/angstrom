@@ -30,28 +30,6 @@ pub struct PoolPrice<'a> {
 }
 
 impl<'a> PoolPrice<'a> {
-    /// Build a PriceRange from the current price to the closer of either the
-    /// target price or the bound of the current liquidity pool.  Will jump
-    /// to the next liquidity pool if we're currently on the edge of one
-    pub fn buy_to_price(&self, target_price: SqrtPriceX96) -> Option<PoolPriceVec<'a>> {
-        self.order_to_target(Some(target_price), true)
-    }
-
-    /// Build a PriceRange from the current price to the bound of the current
-    /// liquidity pool.  Will jump to the next liquidity pool if we're
-    /// currently on the edge of one.
-    pub fn buy_to_next_bound(&self) -> Option<PoolPriceVec<'a>> {
-        self.order_to_target(None, true)
-    }
-
-    pub fn sell_to_price(&self, target_price: SqrtPriceX96) -> Option<PoolPriceVec<'a>> {
-        self.order_to_target(Some(target_price), false)
-    }
-
-    pub fn sell_to_next_bound(&self) -> Option<PoolPriceVec<'a>> {
-        self.order_to_target(None, false)
-    }
-
     pub fn tick(&self) -> Tick {
         self.tick
     }

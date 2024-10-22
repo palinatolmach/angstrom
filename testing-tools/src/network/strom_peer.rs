@@ -1,6 +1,7 @@
 use std::{collections::HashSet, net::SocketAddr, sync::Arc, task::Poll};
 
 use alloy_chains::Chain;
+use alloy_primitives::Address;
 use angstrom_network::{
     manager::StromConsensusEvent, state::StromState, NetworkOrderEvent, StatusState,
     StromNetworkEvent, StromNetworkHandle, StromNetworkManager, StromProtocolHandler,
@@ -9,12 +10,12 @@ use angstrom_network::{
 use futures::{Future, FutureExt};
 use parking_lot::RwLock;
 use rand::thread_rng;
+use reth_chainspec::Hardforks;
 use reth_metrics::common::mpsc::{MeteredPollSender, UnboundedMeteredSender};
 use reth_network::test_utils::{Peer, PeerConfig};
 use reth_network_api::{PeerId, Peers};
 use reth_network_peers::pk2id;
-use reth_primitives::Address;
-use reth_provider::{test_utils::NoopProvider, BlockReader, HeaderProvider};
+use reth_provider::{test_utils::NoopProvider, BlockReader, ChainSpecProvider, HeaderProvider};
 use secp256k1::{PublicKey, Secp256k1};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::PollSender;
@@ -31,9 +32,10 @@ pub struct StromPeer<C = NoopProvider> {
     pub secret_key:    SecretKey
 }
 
-impl<C: Unpin> StromPeer<C>
+impl<C> StromPeer<C>
 where
-    C: BlockReader + HeaderProvider + Unpin + Clone + 'static
+    C: BlockReader + HeaderProvider + ChainSpecProvider + Unpin + Clone + 'static,
+    <C as ChainSpecProvider>::ChainSpec: Hardforks
 {
     pub async fn new(c: C) -> Self {
         let mut rng = thread_rng();
@@ -190,9 +192,9 @@ where
         cx: &mut std::task::Context<'_>
     ) -> std::task::Poll<Self::Output> {
         let this = self.get_mut();
-        let peer_id = this.get_node_public_key();
-        let span = span!(Level::TRACE, "peer_id: {:?}", ?peer_id);
-        let e = span.enter();
+        // let peer_id = this.get_node_public_key();
+        // let span = span!(Level::TRACE, "peer_id: {:?}", ?peer_id);
+        // let e = span.enter();
 
         if this.strom_network.poll_unpin(cx).is_ready() {
             return Poll::Ready(())
@@ -201,7 +203,7 @@ where
             return Poll::Ready(())
         }
 
-        drop(e);
+        // drop(e);
 
         Poll::Pending
     }

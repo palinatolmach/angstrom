@@ -1,6 +1,6 @@
 use std::{fmt::Debug, future::Future, pin::Pin};
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256};
 use angstrom_types::{
     orders::{OrderId, OrderOrigin},
     sol_bindings::{

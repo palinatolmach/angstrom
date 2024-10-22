@@ -66,6 +66,16 @@ impl<'a> Deref for LiqRangeRef<'a> {
     }
 }
 
+impl<'a> PartialEq for LiqRangeRef<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.pool_snap, other.pool_snap)
+            && std::ptr::eq(self.range, other.range)
+            && self.range_idx == other.range_idx
+    }
+}
+
+impl<'a> Eq for LiqRangeRef<'a> {}
+
 impl<'a> LiqRangeRef<'a> {
     pub fn new(market: &'a PoolSnapshot, range: &'a LiqRange, range_idx: usize) -> Self {
         Self { pool_snap: market, range, range_idx }

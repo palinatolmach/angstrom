@@ -1,9 +1,12 @@
 use std::future::IntoFuture;
 
-use alloy::{primitives::keccak256, providers::Provider, transports::TransportResult};
+use alloy::{
+    primitives::{keccak256, Address, BlockNumber, StorageKey, StorageValue},
+    providers::Provider,
+    transports::TransportResult
+};
 use eyre::bail;
 use futures::Future;
-use reth_primitives::{Account, Address, BlockNumber, StorageKey, StorageValue};
 use reth_provider::{ProviderError, ProviderResult};
 use reth_revm::primitives::Bytecode;
 use validation::common::db::{BlockStateProvider, BlockStateProviderFactory};

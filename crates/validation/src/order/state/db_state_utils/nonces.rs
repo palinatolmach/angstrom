@@ -1,7 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use alloy::primitives::{hex, Address, B256, U256};
-use reth_primitives::keccak256;
+use alloy::primitives::{hex, keccak256, Address, B256, U256};
 use reth_revm::DatabaseRef;
 
 use super::ANGSTROM_CONTRACT;

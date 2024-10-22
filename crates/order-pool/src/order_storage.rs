@@ -6,7 +6,7 @@ use std::{
     time::Instant
 };
 
-use alloy::primitives::FixedBytes;
+use alloy::primitives::{BlockNumber, FixedBytes, B256};
 use angstrom_metrics::OrderStorageMetricsWrapper;
 use angstrom_types::{
     orders::{OrderId, OrderLocation, OrderSet},
@@ -16,7 +16,6 @@ use angstrom_types::{
         rpc_orders::TopOfBlockOrder
     }
 };
-use reth_primitives::{BlockNumber, B256};
 
 use crate::{
     finalization_pool::FinalizationPool,

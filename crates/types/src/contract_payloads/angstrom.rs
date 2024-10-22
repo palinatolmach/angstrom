@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
+use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, B256, U256};
 use pade_macro::{PadeDecode, PadeEncode};
-use reth_primitives::keccak256;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -14,7 +13,7 @@ use super::{
 };
 use crate::{
     consensus::{PreProposal, Proposal},
-    matching::Ray,
+    matching::{uniswap::PoolSnapshot, Ray},
     orders::{OrderFillState, OrderOutcome},
     sol_bindings::{
         grouped_orders::{GroupedVanillaOrder, OrderWithStorageData},
@@ -242,7 +241,7 @@ impl AngstromBundle {
 
     pub fn from_proposal(
         proposal: &Proposal,
-        pools: &HashMap<FixedBytes<32>, (Address, Address)>
+        pools: &HashMap<FixedBytes<32>, (Address, Address, PoolSnapshot, u16)>
     ) -> eyre::Result<Self> {
         let mut top_of_block_orders = Vec::new();
         let mut pool_updates = Vec::new();
@@ -257,7 +256,7 @@ impl AngstromBundle {
         for solution in proposal.solutions.iter() {
             // Get the information for the pool or skip this solution if we can't find a
             // pool for it
-            let Some((t0, t1)) = pools.get(&solution.id) else {
+            let Some((t0, t1, snapshot, store_index)) = pools.get(&solution.id) else {
                 // This should never happen but let's handle it as gracefully as possible -
                 // right now will skip the pool, not produce an error
                 warn!("Skipped a solution as we couldn't find a pool for it: {:?}", solution);
@@ -269,8 +268,15 @@ impl AngstromBundle {
             let t1_idx = asset_builder.add_or_get_asset(*t1) as u16;
             // Build our Pair featuring our uniform clearing price
             // This price is in Ray format as requested.
-            let uniswap_price: U256 = *solution.ucp;
-            // pairs.push(Pair { t0_idx, t1_idx, uniswap_price });
+            // TODO:  Get the store index so this can be correct
+            let ucp: U256 = *solution.ucp;
+            let pair = Pair {
+                index0:       t0_idx,
+                index1:       t1_idx,
+                store_index:  *store_index,
+                price_1over0: ucp
+            };
+            pairs.push(pair);
             let pair_idx = pairs.len() - 1;
 
             // Pull out our net AMM order
@@ -288,10 +294,9 @@ impl AngstromBundle {
                     } else {
                         (t0_idx, t1_idx, tob.quantityIn, tob.quantityOut)
                     };
-                    // let amm = MarketSnapshot::new(vec![], SqrtPriceX96::default()).unwrap();
-                    //let rewards = calculate_reward(tob, amm).unwrap();
-                    let rewards = ToBOutcome::default();
-                    (Some(swap), Some(rewards))
+                    // We swallow an error here
+                    let outcome = ToBOutcome::from_tob_and_snapshot(tob, snapshot).ok();
+                    (Some(swap), outcome)
                 })
                 .unwrap_or_default();
             // Merge our net AMM order with the TOB swap
@@ -331,7 +336,7 @@ impl AngstromBundle {
             // Push the pool update
             pool_updates.push(PoolUpdate {
                 zero_for_one: false,
-                pair_index: 0,
+                pair_index: pair_idx as u16,
                 swap_in_quantity: quantity_in,
                 rewards_update
             });
@@ -376,11 +381,10 @@ impl AngstromBundle {
                     _ => order.quantity()
                 };
                 // Calculate the price of this order given the amount filled and the UCP
-                let ray_price = Ray::from(uniswap_price);
                 let quantity_in = if order.is_bid {
-                    ray_price.mul_quantity(quantity_out)
+                    Ray::from(ucp).mul_quantity(quantity_out)
                 } else {
-                    ray_price.inverse_quantity(quantity_out)
+                    Ray::from(ucp).inverse_quantity(quantity_out)
                 };
                 // Account for our user order
                 let (asset_in, asset_out) = if order.is_bid { (*t1, *t0) } else { (*t0, *t1) };
@@ -413,5 +417,23 @@ impl AngstromBundle {
         user_orders: Vec<UserOrder>
     ) -> Self {
         Self { assets, pairs, pool_updates, top_of_block_orders, user_orders }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use revm::primitives::FixedBytes;
+
+    use super::AngstromBundle;
+    use crate::{consensus::Proposal, orders::PoolSolution};
+
+    #[test]
+    fn can_be_constructed() {
+        let result = AngstromBundle::new(vec![], vec![], vec![], vec![], vec![]);
+    }
+
+    #[test]
+    fn can_be_cretaed_from_proposal() {
+        // AngstromBundle::from_proposal(proposal, pools);
     }
 }

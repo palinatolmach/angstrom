@@ -10,16 +10,19 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolValue
 };
-use angstrom_types::matching::{
-    uniswap::{LiqRange, PoolSnapshot},
-    SqrtPriceX96
+use angstrom_types::{
+    contract_payloads::{
+        rewards::{MockContractMessage, PoolUpdate, RewardsUpdate},
+        Asset, Pair
+    },
+    matching::{
+        uniswap::{LiqRange, PoolSnapshot},
+        SqrtPriceX96
+    }
 };
-use contract_payloads::{Asset, MockContractMessage, Pair, PoolUpdate, RewardsUpdate};
 use pade::PadeEncode;
 use testing_tools::contracts::{environment::mockreward::MockRewardEnv, DebugTransaction};
 use uniswap_v3_math::tick_math::get_sqrt_ratio_at_tick;
-
-mod contract_payloads;
 
 async fn local_anvil() -> eyre::Result<()> {
     let sk: PrivateKeySigner = PrivateKeySigner::from_str(
