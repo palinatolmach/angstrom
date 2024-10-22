@@ -64,7 +64,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: fmt  
-        run: cargo fmt 
+        run: cargo fmt --all --check
   contracts:
     name: 'Build, Format & Test Contracts'
     runs-on: ubuntu-latest
