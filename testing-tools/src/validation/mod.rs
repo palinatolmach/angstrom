@@ -11,7 +11,6 @@ use std::{
 };
 
 use alloy_primitives::{Address, U256};
-use angstrom_network::pool_manager;
 use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
 use futures::FutureExt;
 use matching_engine::cfmm::uniswap::{
