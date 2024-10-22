@@ -15,9 +15,9 @@ use angstrom_utils::key_split_threadpool::KeySplitThreadpool;
 use futures::FutureExt;
 use matching_engine::cfmm::uniswap::{
     pool_manager::UniswapPoolManager,
-    pool_providers::{canonical_state_adapter::CanonicalStateAdapter, PoolManagerProvider}
+    pool_providers::canonical_state_adapter::CanonicalStateAdapter
 };
-use reth_provider::{CanonStateNotification, CanonStateNotifications, StateProviderFactory};
+use reth_provider::{CanonStateNotification, StateProviderFactory};
 use tokio::sync::mpsc::unbounded_channel;
 use validation::{
     order::{
@@ -31,8 +31,6 @@ use validation::{
     },
     validator::{ValidationClient, Validator}
 };
-
-use crate::Provider;
 
 type ValidatorOperation<DB, T> =
     dyn FnOnce(

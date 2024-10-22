@@ -5,6 +5,12 @@ use angstrom_types::{
 };
 
 // Basically only tests in here now
+pub fn calculate_reward(
+    tob: &OrderWithStorageData<TopOfBlockOrder>,
+    snapshot: &PoolSnapshot
+) -> eyre::Result<ToBOutcome> {
+    ToBOutcome::from_tob_and_snapshot(tob, snapshot)
+}
 
 #[cfg(test)]
 mod test {

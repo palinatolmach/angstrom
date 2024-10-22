@@ -422,10 +422,8 @@ impl AngstromBundle {
 
 #[cfg(test)]
 mod test {
-    use revm::primitives::FixedBytes;
 
     use super::AngstromBundle;
-    use crate::{consensus::Proposal, orders::PoolSolution};
 
     #[test]
     fn can_be_constructed() {

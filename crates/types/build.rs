@@ -55,7 +55,7 @@ fn main() {
             Some((raw, path.to_str()?.to_owned()))
         })
         .map(|(name, path_of_contracts)| {
-            let path_of_contracts = path_of_contracts.replace(&this_dir, "../..");
+            let path_of_contracts = path_of_contracts.replace(this_dir, "../..");
 
             let mod_name = name.clone().to_case(Case::Snake);
             format!(

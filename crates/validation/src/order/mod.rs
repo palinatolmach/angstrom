@@ -12,7 +12,6 @@ use angstrom_types::{
     }
 };
 use angstrom_utils::GenericExt;
-use reth_primitives::B256;
 use sim::SimValidation;
 use state::account::user::UserAddress;
 use tokio::sync::oneshot::{channel, Sender};

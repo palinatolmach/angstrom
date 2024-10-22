@@ -1,8 +1,4 @@
-use alloy::{
-    contract::RawCallBuilder,
-    primitives::{Address, U160},
-    sol_types::SolValue
-};
+use alloy::{contract::RawCallBuilder, primitives::Address, sol_types::SolValue};
 use angstrom_types::contract_bindings::mock_rewards_manager::MockRewardsManager;
 
 use super::{mine_address, uniswap_flags::UniswapFlags, DEFAULT_CREATE2_FACTORY};

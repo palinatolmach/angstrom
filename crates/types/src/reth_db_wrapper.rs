@@ -274,11 +274,22 @@ impl<DB> StorageRootProvider for RethDbWrapper<DB>
 where
     DB: StateProviderFactory + Unpin + Clone + 'static
 {
+    fn storage_proof(
+        &self,
+        address: Address,
+        slot: B256,
+        hashed_storage: HashedStorage
+    ) -> ProviderResult<reth_trie::StorageProof> {
+        self.0
+            .latest()?
+            .storage_proof(address, slot, hashed_storage)
+    }
+
     fn storage_root(
         &self,
         address: Address,
         hashed_storage: HashedStorage
-    ) -> reth_provider::ProviderResult<B256> {
+    ) -> ProviderResult<B256> {
         self.0.latest()?.storage_root(address, hashed_storage)
     }
 }
@@ -300,15 +311,15 @@ where
         &self,
         input: TrieInput,
         target: HashedPostState
-    ) -> reth_provider::ProviderResult<std::collections::HashMap<B256, Bytes>> {
+    ) -> ProviderResult<revm::primitives::HashMap<B256, Bytes>> {
         self.0.latest()?.witness(input, target)
     }
 
     fn multiproof(
         &self,
         input: TrieInput,
-        targets: std::collections::HashMap<B256, std::collections::HashSet<B256>>
-    ) -> reth_provider::ProviderResult<MultiProof> {
+        targets: revm::primitives::HashMap<B256, revm::primitives::HashSet<B256>>
+    ) -> ProviderResult<MultiProof> {
         self.0.latest()?.multiproof(input, targets)
     }
 }

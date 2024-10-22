@@ -19,7 +19,6 @@ use reth_provider::{test_utils::NoopProvider, BlockReader, ChainSpecProvider, He
 use secp256k1::{PublicKey, Secp256k1};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::PollSender;
-use tracing::{span, Level};
 
 use crate::network::SecretKey;
 

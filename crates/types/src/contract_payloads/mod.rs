@@ -1,7 +1,4 @@
-use alloy::{
-    primitives::{keccak256, Address, FixedBytes},
-    sol
-};
+use alloy::sol;
 use pade_macro::{PadeDecode, PadeEncode};
 
 pub mod angstrom;
