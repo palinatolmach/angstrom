@@ -61,7 +61,7 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
         context: &mut revm::EvmContext<DB>
     ) {
         let addr = interp.contract().bytecode_address.unwrap();
-        if self.in_flight.is_none() && addr != self.angstrom_address {
+        if self.in_flight.is_none() || addr != self.angstrom_address {
             return
         }
 
