@@ -549,7 +549,7 @@ pub mod test {
         cache_db.insert_account_info(rand, a);
 
         let mut offsets = std::collections::HashMap::default();
-        offsets.insert(0, 7);
+        offsets.insert(0, 8);
 
         let mut inspector = GasSimulationInspector::new(rand, &offsets);
 
