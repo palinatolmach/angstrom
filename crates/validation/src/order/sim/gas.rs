@@ -420,9 +420,10 @@ pub mod test {
     // test to see proper gas_calculations
     use std::path::Path;
 
-    use alloy::node_bindings::WEI_IN_ETHER;
+    use alloy::{node_bindings::WEI_IN_ETHER, primitives:: {hex, U256} };
     use angstrom_types::reth_db_wrapper::RethDbWrapper;
     use eyre::eyre;
+    use revm::primitives::AccountInfo;
     use testing_tools::load_reth_db;
 
     use super::*;
@@ -439,17 +440,18 @@ pub mod test {
 
         assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain");
     }
+
     alloy::sol!(
-    function name() public view returns (string);
-    function symbol() public view returns (string);
-    function decimals() public view returns (uint8);
-    function totalSupply() public view returns (uint256);
-    function balanceOf(address _owner) public view returns (uint256 balance);
-    function transfer(address _to, uint256 _value) public returns (bool success);
-    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success);
-    function approve(address _spender, uint256 _value) public returns (bool success);
-    function allowance(address _owner, address _spender) public view returns (uint256 remaining);
-        );
+        function name() public view returns (string);
+        function symbol() public view returns (string);
+        function decimals() public view returns (uint8);
+        function totalSupply() public view returns (uint256);
+        function balanceOf(address _owner) public view returns (uint256 balance);
+        function transfer(address _to, uint256 _value) public returns (bool success);
+        function transferFrom(address _from, address _to, uint256 _value) public returns (bool success);
+        function approve(address _spender, uint256 _value) public returns (bool success);
+        function allowance(address _owner, address _spender) public view returns (uint256 remaining);
+    );
 
     #[test]
     fn test_simple_gas_calculations_on_a_transfer() {
@@ -528,5 +530,75 @@ pub mod test {
         // 	0007    36  CALLDATASIZE (2)
 
         assert_eq!(gas_used, 5);
+    }
+    
+    #[test]
+    fn test_simple_gas_calculations_on_raw_bytecode() {
+        let rand = address!("d02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+
+        let db_path = Path::new("/home/data/reth/db/");
+        let db = Arc::new(RethDbWrapper::new(load_reth_db(db_path)));
+        let mut cache_db = CacheDB::new(db);
+        let mut a = AccountInfo {
+            balance: U256::ZERO,
+            code: Some(Bytecode::new_raw(alloy::primitives::Bytes::from_static(&hex!("6042604260425860005260206000F3")))),
+            nonce: 0,
+            code_hash: keccak256(hex!("604260005260206000F3"))
+        };
+
+        cache_db.insert_account_info(rand, a);
+
+        let mut offsets = std::collections::HashMap::default();
+        offsets.insert(0, 7);
+
+        let mut inspector = GasSimulationInspector::new(rand, &offsets);
+
+        let mut evm_handler = EnvWithHandlerCfg::default();
+        let tx = &mut evm_handler.tx;
+
+        tx.transact_to = TxKind::Call(rand);
+        tx.caller = DEFAULT_FROM;
+        tx.data = vec![].into();
+        tx.value = U256::from(0);
+
+        let mut evm = revm::Evm::builder()
+            .with_ref_db(cache_db)
+            .with_external_context(&mut inspector)
+            .with_env_with_handler_cfg(evm_handler)
+            .append_handler_register(inspector_handle_register)
+            .modify_env(|env| {
+                env.cfg.disable_balance_check = true;
+            })
+            .build();
+
+        let result = evm
+            .transact()
+            .map_err(|_| eyre!("failed to transact with revm"))
+            .unwrap();
+
+        if !result.result.is_success() {
+            panic!(
+                "gas simulation had a revert. cannot guarantee the proper gas
+        was estimated"
+            )
+        }
+        drop(evm);
+
+        let gas_used = inspector.into_gas_used();
+        // this is the bytecode.
+        // PUSH1 0x42 (3)
+        // PUSH1 0x42 (3)
+        // PUSH1 0x42 (3)
+        // PC (2)
+        // PUSH1 0x00 (3)
+        // MSTORE (6) 
+        // PUSH1 0x20 (3) 
+        // PUSH1 0x00 (3)
+        // RETURN (0)
+
+        let total_gas = result.result.gas_used();
+        assert_eq!(total_gas, 26);
+
+        assert_eq!(gas_used, 14);
     }
 }
