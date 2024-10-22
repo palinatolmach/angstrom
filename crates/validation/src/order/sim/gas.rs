@@ -145,6 +145,7 @@ where
             .with_env_with_handler_cfg(evm_handler)
             .modify_env(|env| {
                 env.cfg.disable_balance_check = true;
+                env.cfg.limit_contract_code_size = Some(usize::MAX -1);
                 env.cfg.disable_block_gas_limit = true;
                 env.cfg.disable_block_gas_limit = true;
             })
