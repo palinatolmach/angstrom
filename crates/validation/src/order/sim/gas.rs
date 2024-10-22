@@ -420,7 +420,10 @@ pub mod test {
     // test to see proper gas_calculations
     use std::path::Path;
 
-    use alloy::{node_bindings::WEI_IN_ETHER, primitives:: {hex, U256} };
+    use alloy::{
+        node_bindings::WEI_IN_ETHER,
+        primitives::{hex, U256}
+    };
     use angstrom_types::reth_db_wrapper::RethDbWrapper;
     use eyre::eyre;
     use revm::primitives::AccountInfo;
@@ -531,7 +534,7 @@ pub mod test {
 
         assert_eq!(gas_used, 5);
     }
-    
+
     #[test]
     fn test_simple_gas_calculations_on_raw_bytecode() {
         let rand = address!("d02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
@@ -540,9 +543,11 @@ pub mod test {
         let db = Arc::new(RethDbWrapper::new(load_reth_db(db_path)));
         let mut cache_db = CacheDB::new(db);
         let mut a = AccountInfo {
-            balance: U256::ZERO,
-            code: Some(Bytecode::new_raw(alloy::primitives::Bytes::from_static(&hex!("6042604260425860005260206000F3")))),
-            nonce: 0,
+            balance:   U256::ZERO,
+            code:      Some(Bytecode::new_raw(alloy::primitives::Bytes::from_static(&hex!(
+                "6042604260425860005260206000F3"
+            )))),
+            nonce:     0,
             code_hash: keccak256(hex!("604260005260206000F3"))
         };
 
@@ -591,8 +596,8 @@ pub mod test {
         // PUSH1 0x42 (3)
         // PC (2)
         // PUSH1 0x00 (3)
-        // MSTORE (6) 
-        // PUSH1 0x20 (3) 
+        // MSTORE (6)
+        // PUSH1 0x20 (3)
         // PUSH1 0x00 (3)
         // RETURN (0)
 

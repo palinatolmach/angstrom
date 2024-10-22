@@ -19,6 +19,8 @@ pub struct GasSimulationInspector<'a> {
 }
 
 impl<'a> GasSimulationInspector<'a> {
+    /// NOTE: due to how revm runs, the offsets act funky. this means that the
+    /// end pc needs to be target pc + 1
     pub fn new(angstrom_address: Address, measurement_ranges: &'a HashMap<usize, usize>) -> Self {
         Self {
             results: HashMap::default(),
@@ -53,7 +55,6 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
             self.in_flight = Some(pc);
             self.in_flight_start_gas = Some(interp.gas().spent());
         }
-
     }
 
     fn step_end(
