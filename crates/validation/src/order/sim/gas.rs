@@ -3,13 +3,14 @@ use std::{collections::HashMap, sync::Arc};
 use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::{Anvil, AnvilInstance},
-    primitives::{keccak256, Address, TxKind, U256},
+    primitives::{address, keccak256, Address, TxKind, U256},
     providers::{
         builder,
         fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
         Identity, IpcConnect, RootProvider
     },
     pubsub::PubSubFrontend,
+    rlp::Bytes,
     signers::local::PrivateKeySigner,
     sol_types::{SolCall, SolValue}
 };
@@ -31,7 +32,7 @@ use revm::{
     handler::register::{EvmHandler, HandleRegister},
     inspector_handle_register,
     interpreter::Gas,
-    primitives::{AccountInfo, EnvWithHandlerCfg, ResultAndState, TxEnv},
+    primitives::{AccountInfo, Bytecode, EnvWithHandlerCfg, ResultAndState, TxEnv},
     DatabaseRef, Evm
 };
 
@@ -39,8 +40,106 @@ use super::gas_inspector::{GasSimulationInspector, GasUsed};
 use crate::BlockStateProviderFactory;
 
 /// A address we can use to deploy contracts
-const DEFAULT_FROM: Address =
-    alloy::primitives::address!("aa250d5630b4cf539739df2c5dacb4c659f2488d");
+const DEFAULT_FROM: Address = address!("aa250d5630b4cf539739df2c5dacb4c659f2488d");
+
+const DEFAULT_CREATE2_FACTORY: Address = address!("4e59b44847b379578588920cA78FbF26c0B4956C");
+
+use std::ops::BitOr;
+
+use alloy::primitives::U160;
+pub enum UniswapFlags {
+    BeforeInitialize,
+    AfterInitialize,
+    BeforeAddLiquidity,
+    AfterAddLiquidity,
+    BeforeRemoveLiquidity,
+    AfterRemoveLiquidity,
+    BeforeSwap,
+    AfterSwap,
+    BeforeDonate,
+    AfterDonate,
+    BeforeSwapReturnsDelta,
+    AfterSwapReturnsDelta,
+    AfterAddLiquidityReturnsDelta,
+    AfterRemoveLiquidityReturnsDelta
+}
+
+impl UniswapFlags {
+    pub fn mask() -> U160 {
+        (U160::from(1_u8) << 14) - U160::from(1_u8)
+    }
+}
+
+impl From<UniswapFlags> for U160 {
+    fn from(value: UniswapFlags) -> U160 {
+        let bitshift: usize = match value {
+            UniswapFlags::BeforeInitialize => 13,
+            UniswapFlags::AfterInitialize => 12,
+            UniswapFlags::BeforeAddLiquidity => 11,
+            UniswapFlags::AfterAddLiquidity => 10,
+            UniswapFlags::BeforeRemoveLiquidity => 9,
+            UniswapFlags::AfterRemoveLiquidity => 8,
+            UniswapFlags::BeforeSwap => 7,
+            UniswapFlags::AfterSwap => 6,
+            UniswapFlags::BeforeDonate => 5,
+            UniswapFlags::AfterDonate => 4,
+            UniswapFlags::BeforeSwapReturnsDelta => 3,
+            UniswapFlags::AfterSwapReturnsDelta => 2,
+            UniswapFlags::AfterAddLiquidityReturnsDelta => 1,
+            UniswapFlags::AfterRemoveLiquidityReturnsDelta => 0
+        };
+        U160::from(1_u8) << bitshift
+    }
+}
+
+impl BitOr for UniswapFlags {
+    type Output = U160;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Into::<U160>::into(self) | Into::<U160>::into(rhs)
+    }
+}
+
+impl BitOr<UniswapFlags> for U160 {
+    type Output = U160;
+
+    fn bitor(self, rhs: UniswapFlags) -> Self::Output {
+        self | Into::<U160>::into(rhs)
+    }
+}
+
+impl BitOr<U160> for UniswapFlags {
+    type Output = U160;
+
+    fn bitor(self, rhs: U160) -> Self::Output {
+        Into::<U160>::into(self) | rhs
+    }
+}
+
+pub fn mine_address_with_factory(
+    factory: Address,
+    flags: U160,
+    mask: U160,
+    initcode: &Bytes
+) -> (Address, U256) {
+    let init_code_hash = keccak256(initcode);
+    let mut salt = U256::ZERO;
+    let mut counter: u128 = 0;
+    loop {
+        let target_address: Address = factory.create2(B256::from(salt), init_code_hash);
+        let u_address: U160 = target_address.into();
+        if (u_address & mask) == flags {
+            break
+        }
+        salt += U256::from(1_u8);
+        counter += 1;
+        if counter > 100_000 {
+            panic!("We tried this too many times!")
+        }
+    }
+    let final_address = factory.create2(B256::from(salt), init_code_hash);
+    (final_address, salt)
+}
 
 /// deals with the calculation of gas for a given type of order.
 /// user orders and tob orders take different paths and are different size and
@@ -191,14 +290,24 @@ where
         // in solidity when deploying. constructor args are appended to the end of the
         // bytecode.
         let constructor_args = (v4_address, DEFAULT_FROM, DEFAULT_FROM).abi_encode().into();
-        let data = [angstrom_raw_bytecode, constructor_args].concat();
+        let data: Bytes = [angstrom_raw_bytecode, constructor_args].concat().into();
+
+        // angstrom deploy is sicko mode.
+        let flags = UniswapFlags::BeforeSwap
+            | UniswapFlags::BeforeInitialize
+            | UniswapFlags::BeforeAddLiquidity
+            | UniswapFlags::BeforeRemoveLiquidity;
+
+        let (angstrom_address, salt) =
+            mine_address_with_factory(DEFAULT_CREATE2_FACTORY, flags, UniswapFlags::mask(), &data);
+
+        let final_mock_initcode = [salt.abi_encode(), data.to_vec()].concat();
 
         let (out, cache_db) = Self::execute_with_db(cache_db, |tx| {
-            tx.transact_to = TxKind::Create;
+            tx.transact_to = TxKind::Call(DEFAULT_CREATE2_FACTORY);
             tx.caller = DEFAULT_FROM;
-            tx.data = data.into();
+            tx.data = final_mock_initcode.into();
             tx.value = U256::from(0);
-            // tx.nonce = Some(1);
         })
         .unwrap();
 
@@ -206,8 +315,6 @@ where
             eyre::bail!("failed to deploy angstrom");
         }
 
-        let angstrom_address =
-            Address::from_slice(&keccak256((DEFAULT_FROM, 1).abi_encode())[12..]);
 
         // enable default from to call the angstrom contract.
         let (out, mut cache_db) = Self::execute_with_db(cache_db, |tx| {
@@ -300,6 +407,31 @@ where
 
         Ok(inspector.into_gas_used())
     }
+}
+
+pub fn mine_address_with_factory(
+    factory: Address,
+    flags: U160,
+    mask: U160,
+    initcode: &Bytes
+) -> (Address, U256) {
+    let init_code_hash = keccak256(initcode);
+    let mut salt = U256::ZERO;
+    let mut counter: u128 = 0;
+    loop {
+        let target_address: Address = factory.create2(B256::from(salt), init_code_hash);
+        let u_address: U160 = target_address.into();
+        if (u_address & mask) == flags {
+            break
+        }
+        salt += U256::from(1_u8);
+        counter += 1;
+        if counter > 100_000 {
+            panic!("We tried this too many times!")
+        }
+    }
+    let final_address = factory.create2(B256::from(salt), init_code_hash);
+    (final_address, salt)
 }
 
 struct ConfiguredRevm<DB> {
