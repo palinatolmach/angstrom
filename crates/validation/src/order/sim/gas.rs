@@ -204,7 +204,8 @@ where
             eyre::bail!("failed to deploy angstrom");
         }
 
-        let angstrom_address = Address::from_slice(&keccak256((DEFAULT_FROM, 1).abi_encode())[12..]);
+        let angstrom_address =
+            Address::from_slice(&keccak256((DEFAULT_FROM, 1).abi_encode())[12..]);
 
         // enable default from to call the angstrom contract.
         let (out, mut cache_db) = Self::execute_with_db(cache_db, |tx| {
