@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::BitOr, sync::Arc};
 
 use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::{Anvil, AnvilInstance},
-    primitives::{address, keccak256, Address, TxKind, B256, U256},
+    primitives::{address, keccak256, Address, TxKind, B256, U160, U256},
     providers::{
         builder,
         fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
@@ -44,9 +44,6 @@ const DEFAULT_FROM: Address = address!("aa250d5630b4cf539739df2c5dacb4c659f2488d
 
 const DEFAULT_CREATE2_FACTORY: Address = address!("4e59b44847b379578588920cA78FbF26c0B4956C");
 
-use std::ops::BitOr;
-
-use alloy::primitives::U160;
 pub enum UniswapFlags {
     BeforeInitialize,
     AfterInitialize,
@@ -355,6 +352,7 @@ where
             cache_db
                 .insert_account_storage(token_out, balance_amount_out_slot.into(), amount_out)
                 .map_err(|_| eyre!("failed to insert account into storage"))?;
+
             cache_db
                 .insert_account_storage(token_in, approval_slot.into(), amount_in)
                 .map_err(|_| eyre!("failed to insert account into storage"))?;
@@ -422,6 +420,7 @@ pub mod test {
     // test to see proper gas_calculations
     use std::path::Path;
 
+    use alloy::node_bindings::WEI_IN_ETHER;
     use angstrom_types::reth_db_wrapper::RethDbWrapper;
     use eyre::eyre;
     use testing_tools::load_reth_db;
@@ -429,14 +428,91 @@ pub mod test {
     use super::*;
 
     #[test]
-    fn see_if_default_deploy_works() {
+    fn ensure_creation_of_mock_works() {
         let db_path = Path::new("/home/data/reth/db/");
         let db = load_reth_db(db_path);
         let res = OrderGasCalculations::new(Arc::new(RethDbWrapper::new(db)));
+
         if let Err(e) = res.as_ref() {
             eprintln!("{}", e);
         }
 
-        assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain ");
+        assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain");
+    }
+    alloy::sol!(
+    function name() public view returns (string);
+    function symbol() public view returns (string);
+    function decimals() public view returns (uint8);
+    function totalSupply() public view returns (uint256);
+    function balanceOf(address _owner) public view returns (uint256 balance);
+    function transfer(address _to, uint256 _value) public returns (bool success);
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success);
+    function approve(address _spender, uint256 _value) public returns (bool success);
+    function allowance(address _owner, address _spender) public view returns (uint256 remaining);
+        );
+
+    #[test]
+    fn test_simple_gas_calculations_on_a_transfer() {
+        let weth_contract = address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+
+        let user_with_funds = address!("d02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+
+        let db_path = Path::new("/home/data/reth/db/");
+        let db = Arc::new(RethDbWrapper::new(load_reth_db(db_path)));
+        let amount = U256::from(50) * WEI_IN_ETHER;
+        let mut cache_db = CacheDB::new(db);
+
+        // setup account with lots of weth
+        for i in 0..10 {
+            let balance_amount_out_slot = keccak256((user_with_funds, i).abi_encode());
+            let approval_slot = keccak256(
+                (DEFAULT_FROM, keccak256((user_with_funds, i).abi_encode())).abi_encode()
+            );
+
+            cache_db
+                .insert_account_storage(weth_contract, balance_amount_out_slot.into(), amount)
+                .map_err(|_| eyre!("failed to insert account into storage"))
+                .unwrap();
+
+            cache_db
+                .insert_account_storage(weth_contract, approval_slot.into(), amount)
+                .map_err(|_| eyre!("failed to insert account into storage"))
+                .unwrap();
+        }
+
+        let mut inspector = GasSimulationInspector::new(weth_contract, offsets);
+        let mut evm_handler = EnvWithHandlerCfg::default();
+        let mut tx = evm_handler.tx;
+
+        tx.transact_to = TxKind::Call(weth_contract);
+        tx.caller = DEFAULT_FROM;
+        tx.data = transferFromCall::new((user_with_funds, DEFAULT_FROM, WEI_IN_ETHER))
+            .abi_encode()
+            .into();
+
+        tx.value = U256::from(0);
+
+        let mut evm = revm::Evm::builder()
+            .with_ref_db(cache_db)
+            .with_external_context(&mut inspector)
+            .with_env_with_handler_cfg(evm_handler)
+            .append_handler_register(inspector_handle_register)
+            .modify_env(|env| {
+                env.cfg.disable_balance_check = true;
+            })
+            .build();
+
+        let result = evm
+            .transact()
+            .map_err(|_| eyre!("failed to transact with revm"))
+            .unwrap();
+
+        // if !result.result.is_success() {
+        //     return Err(eyre::eyre!(
+        //         "gas simulation had a revert. cannot guarantee the proper gas
+        // was estimated"     ))
+        // }
+
+        // Ok(inspector.into_gas_used())
     }
 }
