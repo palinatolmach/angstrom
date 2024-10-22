@@ -3,9 +3,11 @@ use std::{
     sync::Arc
 };
 
-use alloy::primitives::{Address, FixedBytes};
+use alloy::primitives::{Address, FixedBytes, U256};
 use angstrom_types::{pair_with_price::PairsWithPrice, primitive::PoolId};
 use matching_engine::cfmm::uniswap::pool_manager::UniswapPoolManager;
+
+use crate::order::state::pools::angstrom_pools::AngstromPools;
 
 /// The token price generator gives us the avg instantaneous price of the last 5
 /// blocks of the underlying V4 pool. This is then used in order to convert the
@@ -33,10 +35,19 @@ impl<Provider> TokenPriceGenerator<Provider> {
 
     /// NOTE: assumes that the uniswap pool state transition has already
     /// occurred.
-    pub fn on_new_block(&mut self) {
-    }
+    pub fn on_new_block(&mut self) {}
 
-    fn get_best_eth_pair(&self, token0: Address, token1: Address) -> PairsWithPrice {
+    pub fn get_eth_conversion_price(&self, mut token0: Address, mut token1: Address) -> U256 {
+        // sort tokens
+        if token0 > token1 {
+            std::mem::swap(&mut token0, &mut token1);
+        }
+        let key = AngstromPools::build_key(token0, token1);
+        let prev_prices = self.prev_prices.get(&key).unwrap();
+        if prev_prices.len() != 5 {
+            panic!("don't have proper prices");
+        }
+
         todo!()
     }
 }
