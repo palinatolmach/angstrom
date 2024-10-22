@@ -320,8 +320,9 @@ pub mod test {
         let db = load_reth_db(db_path);
         let res = OrderGasCalculations::new(Arc::new(RethDbWrapper::new(db)));
         if let Err(e) = res.as_ref() {
-            println!("{}", e);
+            eprintln!("{}", e);
         }
+
         assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain ");
     }
 }
