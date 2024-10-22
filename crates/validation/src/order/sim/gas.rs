@@ -171,7 +171,7 @@ where
                 angstrom_types::contract_bindings::pool_manager::PoolManager::BYTECODE.clone();
             tx.value = U256::from(0);
             tx.nonce = Some(0);
-        })?;
+        }).unwrap();
 
         if !out.result.is_success() {
             println!("{:?}", out.result);
@@ -198,7 +198,7 @@ where
             tx.data = data.into();
             tx.value = U256::from(0);
             tx.nonce = Some(1);
-        })?;
+        }).unwrap();
 
         if !out.result.is_success() {
             eyre::bail!("failed to deploy angstrom");
@@ -218,7 +218,7 @@ where
             .into();
 
             tx.value = U256::from(0);
-        })?;
+        }).unwrap();
 
         if !out.result.is_success() {
             eyre::bail!("failed to set default from address as node on angstrom");
