@@ -510,11 +510,12 @@ pub mod test {
             .map_err(|_| eyre!("failed to transact with revm"))
             .unwrap();
 
-        // if !result.result.is_success() {
-        //     return Err(eyre::eyre!(
-        //         "gas simulation had a revert. cannot guarantee the proper gas
-        // was estimated"     ))
-        // }
+        if !result.result.is_success() {
+            panic!(
+                "gas simulation had a revert. cannot guarantee the proper gas
+        was estimated"
+            )
+        }
 
         // Ok(inspector.into_gas_used())
     }
