@@ -479,8 +479,9 @@ pub mod test {
                 .map_err(|_| eyre!("failed to insert account into storage"))
                 .unwrap();
         }
+        let offsets = std::collections::HashMap::default();
 
-        let mut inspector = GasSimulationInspector::new(weth_contract, offsets);
+        let mut inspector = GasSimulationInspector::new(weth_contract, &offsets);
         let mut evm_handler = EnvWithHandlerCfg::default();
         let mut tx = evm_handler.tx;
 
