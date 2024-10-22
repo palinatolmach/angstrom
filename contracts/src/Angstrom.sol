@@ -148,12 +148,12 @@ contract Angstrom is
 
         bytes32 orderHash = typedHasher.hashTypedData(buffer.hash());
 
-        _invalidateOrderHash(orderHash);
-
         address from;
         (reader, from) = variantMap.isEcdsa()
             ? SignatureLib.readAndCheckEcdsa(reader, orderHash)
             : SignatureLib.readAndCheckERC1271(reader, orderHash);
+
+        _invalidateOrderHash(orderHash, from);
 
         address to = buffer.recipient;
         assembly {
@@ -237,7 +237,7 @@ contract Angstrom is
             _checkDeadline(buffer.deadline_or_empty);
             _invalidateNonce(from, buffer.nonce_or_validForBlock);
         } else {
-            _invalidateOrderHash(orderHash);
+            _invalidateOrderHash(orderHash, from);
         }
 
         // Push before hook as a potential loan.

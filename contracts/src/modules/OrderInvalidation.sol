@@ -9,7 +9,7 @@ abstract contract OrderInvalidation {
     error OrderAlreadyExecuted();
     error Expired();
 
-    mapping(bytes32 => tuint256) internal alreadyExecuted;
+    mapping(bytes32 => mapping(address => tuint256)) internal alreadyExecuted;
 
     /// @dev `keccak256("angstrom-v1_0.unordered-nonces.slot")[0:4]`
     uint256 private constant UNORDERED_NONCES_SLOT = 0xdaa050e9;
@@ -42,8 +42,8 @@ abstract contract OrderInvalidation {
         }
     }
 
-    function _invalidateOrderHash(bytes32 orderHash) internal {
-        tuint256 storage executed = alreadyExecuted[orderHash];
+    function _invalidateOrderHash(bytes32 orderHash, address from) internal {
+        tuint256 storage executed = alreadyExecuted[orderHash][from];
         if (executed.get() != 0) revert OrderAlreadyExecuted();
         executed.set(1);
     }
