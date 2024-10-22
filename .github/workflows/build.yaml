@@ -50,7 +50,7 @@ jobs:
       - name: Build Tests
         run: cargo build --tests
   format:
-    name: 'rust fmt'
+    name: 'Ensure Rust Fmt'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
