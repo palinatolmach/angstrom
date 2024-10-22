@@ -1,5 +1,6 @@
 use std::{collections::HashSet, net::SocketAddr, sync::Arc, task::Poll};
 
+use alloy::primitives::Address;
 use alloy_chains::Chain;
 use angstrom::cli::StromHandles;
 use angstrom_network::{
@@ -14,8 +15,8 @@ use reth_metrics::common::mpsc::{MeteredPollSender, UnboundedMeteredSender};
 use reth_network::test_utils::{Peer, PeerConfig};
 use reth_network_api::Peers;
 use reth_network_peers::{pk2id, PeerId};
-use reth_primitives::Address;
-use reth_provider::{test_utils::NoopProvider, BlockReader, HeaderProvider};
+use reth_primitives::Hardforks;
+use reth_provider::{test_utils::NoopProvider, BlockReader, ChainSpecProvider, HeaderProvider};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::PollSender;
@@ -32,7 +33,8 @@ pub struct StromPeer<C = NoopProvider> {
 
 impl<C: Unpin> StromPeer<C>
 where
-    C: BlockReader + HeaderProvider + Unpin + Clone + 'static
+    C: BlockReader + HeaderProvider + ChainSpecProvider + Unpin + Clone + 'static,
+    <C as ChainSpecProvider>::ChainSpec: Hardforks
 {
     pub async fn new(c: C) -> Self {
         let mut rng = thread_rng();

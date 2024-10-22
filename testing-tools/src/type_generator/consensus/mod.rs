@@ -8,19 +8,25 @@ use angstrom_types::{
 };
 use blsful::{Bls12381G1Impl, SecretKey};
 use proposal::ProposalBuilder;
-use rand::rngs::ThreadRng;
 
-use super::orders::DistributionParameters;
-use crate::type_generator::orders::{generate_limit_order, generate_order_distribution};
+use super::orders::{DistributionParameters, UserOrderBuilder};
+use crate::type_generator::orders::generate_order_distribution;
 
 pub fn generate_limit_order_set(
-    rng: &mut ThreadRng,
     count: usize,
     is_bid: bool,
     block: u64
 ) -> Vec<OrderWithStorageData<GroupedVanillaOrder>> {
     (0..count)
-        .map(|_| generate_limit_order(rng, true, is_bid, None, Some(block), None, None, None, None))
+        .map(|_| {
+            UserOrderBuilder::new()
+                .kill_or_fill()
+                .block(block)
+                .with_storage()
+                .valid_block(block)
+                .is_bid(is_bid)
+                .build()
+        })
         .collect()
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alloy::{
     network::Network,
-    primitives::{aliases::I24, Address, I256, U256},
+    primitives::{aliases::I24, Address, BlockNumber, Log, I256, U256},
     providers::Provider,
     sol,
     sol_types::{SolEvent, SolType},
@@ -16,7 +16,6 @@ use amms::{
     },
     errors::{AMMError, EventLogError}
 };
-use reth_primitives::{BlockNumber, Log};
 use thiserror::Error;
 use uniswap_v3_math::{
     error::UniswapV3MathError,

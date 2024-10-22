@@ -1,5 +1,5 @@
 use alloy::primitives::{FixedBytes, Log};
-use reth_primitives::Address;
+use alloy_primitives::Address;
 
 use crate::contract_bindings::pool_manager::PoolManager::Initialize;
 

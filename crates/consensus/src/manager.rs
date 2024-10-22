@@ -1,41 +1,20 @@
-use std::{
-    collections::{HashMap, HashSet},
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-    thread::current
-};
+use std::{collections::HashSet, sync::Arc};
 
-use alloy_primitives::{bloom, BlockNumber};
+use alloy_primitives::BlockNumber;
 use angstrom_metrics::ConsensusMetricsWrapper;
-use angstrom_network::{manager::StromConsensusEvent, Peer, StromMessage, StromNetworkHandle};
-use angstrom_types::{
-    consensus::{Commit, PreProposal, Proposal},
-    contract_payloads::angstrom::TopOfBlockOrder,
-    orders::PoolSolution
-};
-use futures::{FutureExt, Stream, StreamExt};
-use matching_engine::MatchingManager;
-use order_pool::{order_storage::OrderStorage, timer::async_time_fn};
+use angstrom_network::{manager::StromConsensusEvent, StromMessage, StromNetworkHandle};
+use futures::{FutureExt, StreamExt};
+use order_pool::order_storage::OrderStorage;
 use reth_metrics::common::mpsc::UnboundedMeteredReceiver;
-use reth_primitives::transaction::WithEncoded;
 use reth_provider::{CanonStateNotification, CanonStateNotifications};
-use reth_rpc_types::{beacon::relay::Validator, PeerId};
 use reth_tasks::TaskSpawner;
-use serde::__private::ser::FlatMapSerializeStructVariantAsMapValue;
-use serde_json::error::Category::Data;
-use tokio::{
-    select,
-    sync::mpsc::{channel, unbounded_channel, Receiver, Sender, UnboundedReceiver},
-    task::{JoinHandle, JoinSet}
-};
-use tokio_stream::wrappers::{BroadcastStream, ReceiverStream};
-use tracing::{error, warn};
+use tokio::{select, task::JoinHandle};
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{
     leader_selection::WeightedRoundRobin,
     round::{BidAggregation, BidSubmission, ConsensusState, Finalization, RoundStateMachine},
-    AngstromValidator, ConsensusListener, ConsensusMessage, ConsensusUpdater, Signer
+    AngstromValidator, Signer
 };
 
 pub struct ConsensusManager {

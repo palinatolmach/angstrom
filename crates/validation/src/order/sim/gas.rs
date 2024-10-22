@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use alloy::{
     network::{Ethereum, EthereumWallet},
     node_bindings::{Anvil, AnvilInstance},
-    primitives::{Address, U256},
+    primitives::{keccak256, Address, TxKind, U256},
     providers::{
         builder,
         fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
@@ -25,7 +25,7 @@ use angstrom_types::{
 use eyre::eyre;
 use pade::PadeEncode;
 use reth_errors::RethError;
-use reth_primitives::{keccak256, transaction::FillTxEnv, TxKind};
+use reth_primitives::transaction::FillTxEnv;
 use revm::{
     db::{CacheDB, WrapDatabaseRef},
     handler::register::{EvmHandler, HandleRegister},

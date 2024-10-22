@@ -1,7 +1,7 @@
 use alloy::{
     primitives::{
         aliases::{I24, U24},
-        Bytes
+        keccak256, Bytes
     },
     sol_types::SolValue
 };
@@ -16,7 +16,6 @@ use angstrom_types::{
     }
 };
 use pade::PadeEncode;
-use reth_primitives::keccak256;
 use testing_tools::contracts::{environment::mockreward::MockRewardEnv, DebugTransaction};
 use uniswap_v3_math::tick_math::get_sqrt_ratio_at_tick;
 

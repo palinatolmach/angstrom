@@ -3,12 +3,12 @@ use std::{
     sync::{atomic::AtomicU64, Arc}
 };
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, BlockNumber, StorageKey, StorageValue};
 use parking_lot::RwLock;
 use reth_errors::{ProviderError, RethError, RethResult};
 use reth_primitives::{
     revm_primitives::{AccountInfo, Bytecode, B256, U256},
-    Account, BlockNumber, StorageKey, StorageValue, KECCAK_EMPTY
+    Account, KECCAK_EMPTY
 };
 use reth_provider::{
     AccountReader, BlockNumReader, ProviderResult, StateProvider, StateProviderBox,

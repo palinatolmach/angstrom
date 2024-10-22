@@ -1,14 +1,13 @@
 #![allow(missing_docs)]
 use std::{fmt::Debug, sync::Arc};
 
-use alloy::rlp::{Decodable, Encodable};
+use alloy::rlp::{Buf, BufMut, Decodable, Encodable};
 use angstrom_types::{
     consensus::{Commit, PreProposal, Proposal},
     sol_bindings::grouped_orders::AllOrders
 };
 use reth_eth_wire::{protocol::Protocol, Capability};
 use reth_network_p2p::error::RequestError;
-use reth_primitives::bytes::{Buf, BufMut};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::StromStreamError;

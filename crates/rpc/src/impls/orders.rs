@@ -1,3 +1,4 @@
+use alloy_primitives::Address;
 use angstrom_types::{
     orders::OrderOrigin,
     sol_bindings::{
@@ -61,8 +62,11 @@ where
     }
 
     async fn cancel_order(&self, request: CancelOrderRequest) -> RpcResult<bool> {
-        let sender = request.signature.recover_signer(request.hash);
-        if sender.is_none() {
+        let sender = request
+            .signature
+            .recover_signer_full_public_key(request.hash)
+            .map(|s| Address::from_raw_public_key(&*s));
+        if sender.is_err() {
             return Err(InvalidSignature.into());
         }
         Ok(self.pool.cancel_order(sender.unwrap(), request.hash).await)
@@ -129,7 +133,7 @@ pub fn rpc_err(
         code,
         msg.into(),
         data.map(|data| {
-            jsonrpsee::core::to_json_raw_value(&reth_primitives::hex::encode_prefixed(data))
+            jsonrpsee::core::to_json_raw_value(&alloy_primitives::hex::encode_prefixed(data))
                 .expect("serializing String can't fail")
         })
     )

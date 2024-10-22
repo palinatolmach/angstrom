@@ -20,28 +20,6 @@ pub struct OrderCoordinate {
 }
 
 #[derive(Clone, Debug)]
-pub enum OrderDirection {
-    Bid,
-    Ask
-}
-
-impl OrderDirection {
-    pub fn is_bid(&self) -> bool {
-        match self {
-            OrderDirection::Bid => true,
-            OrderDirection::Ask => false
-        }
-    }
-
-    pub fn is_ask(&self) -> bool {
-        match self {
-            OrderDirection::Bid => false,
-            OrderDirection::Ask => true
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
 pub enum OrderExclusion {
     Live(usize),
     Dead(usize)

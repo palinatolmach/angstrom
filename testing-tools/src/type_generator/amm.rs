@@ -65,10 +65,10 @@ impl AMMSnapshotBuilder {
             generate_pool_distribution(self.lower_tick, self.upper_tick, liquidity_distribution)
                 .unwrap()
         } else {
-            let width = self.default_position_width.unwrap_or_default();
+            let width = self.default_position_width.unwrap_or(1);
             let lower_tick = self.lower_tick.saturating_sub(width);
             let upper_tick = self.upper_tick.saturating_add(width);
-            let liquidity = self.default_position_liquidity.unwrap_or_default();
+            let liquidity = self.default_position_liquidity.unwrap_or(1);
             vec![LiqRange::new(lower_tick, upper_tick, liquidity).unwrap()]
         };
         PoolSnapshot::new(ranges, self.price).unwrap()

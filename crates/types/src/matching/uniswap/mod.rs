@@ -8,6 +8,8 @@ pub use poolprice::PoolPrice;
 pub use poolpricevec::PoolPriceVec;
 pub use poolsnapshot::PoolSnapshot;
 
+use super::SqrtPriceX96;
+
 pub type Tick = i32;
 
 pub enum Quantity {
@@ -61,6 +63,13 @@ impl Direction {
         matches!(self, Self::BuyingT0)
     }
 
+    pub fn from_prices(start: SqrtPriceX96, end: SqrtPriceX96) -> Self {
+        match start.cmp(&end) {
+            std::cmp::Ordering::Less => Self::SellingT0,
+            _ => Self::BuyingT0
+        }
+    }
+
     /// Returns true if the given quantity is on the input side of this
     /// direction
     pub fn is_input(&self, q: &Quantity) -> bool {
@@ -77,6 +86,15 @@ impl Direction {
         match self {
             Self::BuyingT0 => (amount_out, amount_in),
             Self::SellingT0 => (amount_in, amount_out)
+        }
+    }
+
+    /// Given our transaction direction turns (q_t0, q_t1) into (amount_in,
+    /// amount_out)
+    pub fn sort_amounts<T>(&self, token0: T, token1: T) -> (T, T) {
+        match self {
+            Self::BuyingT0 => (token1, token0),
+            Self::SellingT0 => (token0, token1)
         }
     }
 }

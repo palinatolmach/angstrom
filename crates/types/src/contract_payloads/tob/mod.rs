@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
 use alloy::primitives::{aliases::I24, U256};
+use eyre::eyre;
 
 use super::rewards::RewardsUpdate;
-use crate::matching::uniswap::Tick;
+use crate::{
+    matching::uniswap::{PoolSnapshot, Quantity, Tick},
+    sol_bindings::{grouped_orders::OrderWithStorageData, rpc_orders::TopOfBlockOrder}
+};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ToBOutcome {
@@ -26,6 +30,32 @@ impl ToBOutcome {
     /// Tick donations plus tribute to determine total value of this outcome
     pub fn total_value(&self) -> U256 {
         self.total_donations() + self.tribute
+    }
+
+    pub fn from_tob_and_snapshot(
+        tob: &OrderWithStorageData<TopOfBlockOrder>,
+        snapshot: &PoolSnapshot
+    ) -> eyre::Result<Self> {
+        let output = match tob.is_bid {
+            true => Quantity::Token0(tob.quantityOut),
+            false => Quantity::Token1(tob.quantityOut)
+        };
+        let pricevec = (snapshot.current_price() - output)?;
+        let total_cost: u128 = pricevec.input().saturating_to();
+        if total_cost > tob.quantityIn {
+            return Err(eyre!("Not enough input to cover the transaction"));
+        }
+        let leftover = tob.quantityIn - total_cost;
+        let donation = pricevec.donation(leftover);
+        let rewards = ToBOutcome {
+            start_tick:      snapshot.current_price().tick(),
+            start_liquidity: snapshot.current_price().liquidity(),
+            tribute:         U256::from(donation.tribute),
+            total_cost:      pricevec.input(),
+            total_reward:    U256::from(donation.total_donated),
+            tick_donations:  donation.tick_donations
+        };
+        Ok(rewards)
     }
 
     pub fn to_rewards_update(&self) -> RewardsUpdate {

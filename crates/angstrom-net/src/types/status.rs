@@ -3,9 +3,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH}
 };
 
-use angstrom_types::primitive::Signature;
-use reth_primitives::{alloy_primitives::FixedBytes, keccak256, BufMut, BytesMut};
-use reth_rpc_types::PeerId;
+use alloy::{
+    primitives::{keccak256, FixedBytes},
+    rlp::{BufMut, BytesMut}
+};
+use angstrom_types::primitive::{PeerId, Signature};
 use serde::{Deserialize, Serialize};
 
 use crate::StatusBuilder;

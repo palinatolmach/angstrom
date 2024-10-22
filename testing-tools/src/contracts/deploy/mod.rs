@@ -1,5 +1,6 @@
 use alloy::primitives::{address, keccak256, Address, Bytes, B256, U160, U256};
 
+pub mod angstrom;
 pub mod mockreward;
 pub mod tokens;
 pub mod uniswap_flags;

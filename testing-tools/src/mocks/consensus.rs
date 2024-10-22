@@ -1,8 +1,10 @@
 use std::time::Duration;
 
 use angstrom_network::manager::StromConsensusEvent;
-use angstrom_types::consensus::{Commit, PreProposal, Proposal};
-use reth_rpc_types::PeerId;
+use angstrom_types::{
+    consensus::{Commit, PreProposal, Proposal},
+    primitive::PeerId
+};
 use tokio::{
     sync::{
         mpsc::{unbounded_channel, UnboundedSender},

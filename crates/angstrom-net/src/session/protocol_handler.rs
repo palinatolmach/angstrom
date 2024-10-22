@@ -1,10 +1,10 @@
 use std::{collections::HashSet, fmt::Debug, net::SocketAddr, sync::Arc};
 
+use alloy::primitives::Address;
+use angstrom_types::primitive::PeerId;
 use parking_lot::RwLock;
 use reth_metrics::common::mpsc::MeteredPollSender;
 use reth_network::protocol::ProtocolHandler;
-use reth_network_peers::PeerId;
-use reth_primitives::Address;
 use tokio::time::Duration;
 
 use crate::{StromConnectionHandler, StromSessionMessage, VerificationSidecar};

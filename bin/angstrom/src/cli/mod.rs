@@ -1,14 +1,12 @@
 //! CLI definition and entrypoint to executable
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-// use reth_provider::State
+use alloy_primitives::Address;
 use angstrom_metrics::{initialize_prometheus_metrics, METRICS_ENABLED};
 use angstrom_network::manager::StromConsensusEvent;
 use angstrom_types::reth_db_wrapper::RethDbWrapper;
 use order_pool::{order_storage::OrderStorage, PoolConfig, PoolManagerUpdate};
-use reth::primitives::Address;
 use reth_node_builder::{FullNode, NodeHandle};
-use reth_provider::BlockReaderIdExt;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 use tokio::sync::mpsc::{
     channel, unbounded_channel, Receiver, Sender, UnboundedReceiver, UnboundedSender
@@ -26,12 +24,13 @@ use angstrom_network::{
     VerificationSidecar
 };
 use angstrom_rpc::{api::OrderApiServer, OrderApi};
+use angstrom_types::primitive::PeerId;
 use clap::Parser;
 use consensus::{AngstromValidator, ConsensusManager, ManagerNetworkDeps, Signer};
 use reth::{
     api::NodeAddOns,
-    args::utils::DefaultChainSpecParser,
     builder::{FullNodeComponents, Node},
+    chainspec::EthereumChainSpecParser,
     cli::Cli,
     providers::{BlockNumReader, CanonStateSubscriptions},
     tasks::TaskExecutor
@@ -40,7 +39,6 @@ use reth_cli_util::get_secret_key;
 use reth_metrics::common::mpsc::{UnboundedMeteredReceiver, UnboundedMeteredSender};
 use reth_network_peers::pk2id;
 use reth_node_ethereum::{node::EthereumAddOns, EthereumNode};
-use reth_rpc_types::PeerId;
 use validation::init_validation;
 
 use crate::cli::network_builder::AngstromNetworkBuilder;
@@ -49,7 +47,7 @@ use crate::cli::network_builder::AngstromNetworkBuilder;
 /// chosen command.
 #[inline]
 pub fn run() -> eyre::Result<()> {
-    Cli::<DefaultChainSpecParser, AngstromConfig>::parse().run(|builder, args| async move {
+    Cli::<EthereumChainSpecParser, AngstromConfig>::parse().run(|builder, args| async move {
         let executor = builder.task_executor().clone();
 
         if args.metrics {
@@ -77,7 +75,7 @@ pub fn run() -> eyre::Result<()> {
                     .components_builder()
                     .network(AngstromNetworkBuilder::new(protocol_handle))
             )
-            .with_add_ons::<EthereumAddOns>()
+            .with_add_ons::<EthereumAddOns>(Default::default())
             .extend_rpc_modules(move |rpc_context| {
                 let order_api = OrderApi::new(pool.clone(), executor_clone);
                 // let quotes_api = QuotesApi { pool: pool.clone() };

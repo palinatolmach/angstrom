@@ -4,9 +4,9 @@ use std::{
     task::{Context, Poll}
 };
 
+use alloy::primitives::{Address, B256};
 use angstrom_types::{orders::OrderOrigin, sol_bindings::grouped_orders::AllOrders};
 use futures_util::{stream::FuturesUnordered, Future, FutureExt, Stream, StreamExt};
-use reth_primitives::{Address, B256};
 use tracing::info;
 use validation::order::{OrderValidationResults, OrderValidatorHandle};
 

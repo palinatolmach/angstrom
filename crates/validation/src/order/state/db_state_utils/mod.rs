@@ -157,7 +157,7 @@ pub mod test_fetching {
     }
 
     impl StateFetchUtils for MockFetch {
-        fn is_valid_nonce(&self, user: reth_primitives::Address, nonce: u64) -> bool {
+        fn is_valid_nonce(&self, user: alloy::primitives::Address, nonce: u64) -> bool {
             self.used_nonces
                 .get(&user)
                 .map(|v| !v.value().contains(&nonce))

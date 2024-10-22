@@ -119,7 +119,7 @@ impl<Pools: PoolsTracker, Fetch: StateFetchUtils, Provider: PoolManagerProvider 
                     let pool_address = Address::from_slice(&order_with_storage.pool_id[..20]);
                     let market_snapshot =
                         self.pool_manager.get_market_snapshot(pool_address).unwrap();
-                    let rewards = calculate_reward(&tob_order, market_snapshot).unwrap();
+                    let rewards = calculate_reward(&tob_order, &market_snapshot).unwrap();
                     order_with_storage.tob_reward = rewards.total_reward;
                 }
 

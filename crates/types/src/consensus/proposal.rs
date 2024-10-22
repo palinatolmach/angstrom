@@ -1,12 +1,14 @@
 use alloy::primitives::BlockNumber;
+use alloy_primitives::keccak256;
 use bytes::Bytes;
-use reth_network_peers::PeerId;
-use reth_primitives::keccak256;
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 
 use super::PreProposal;
-use crate::{orders::PoolSolution, primitive::Signature};
+use crate::{
+    orders::PoolSolution,
+    primitive::{PeerId, Signature}
+};
 
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Proposal {
