@@ -2,7 +2,7 @@
 members = [
   "bin/angstrom",
   "bin/testnet",
-  "bin/contract_test",
+  # "bin/contract_test",
   "crates/angstrom-net",
   "crates/consensus",
   "crates/types",

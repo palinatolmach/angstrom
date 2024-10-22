@@ -19,6 +19,8 @@ pub struct GasSimulationInspector<'a> {
 }
 
 impl<'a> GasSimulationInspector<'a> {
+    /// NOTE: due to how revm runs, the offsets act funky. this means that the
+    /// end pc needs to be target pc + 1
     pub fn new(angstrom_address: Address, measurement_ranges: &'a HashMap<usize, usize>) -> Self {
         Self {
             results: HashMap::default(),
@@ -61,7 +63,7 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
         context: &mut revm::EvmContext<DB>
     ) {
         let addr = interp.contract().bytecode_address.unwrap();
-        if self.in_flight.is_none() && addr != self.angstrom_address {
+        if self.in_flight.is_none() || addr != self.angstrom_address {
             return
         }
 
