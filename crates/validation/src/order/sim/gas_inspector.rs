@@ -85,3 +85,4 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
         }
     }
 }
+

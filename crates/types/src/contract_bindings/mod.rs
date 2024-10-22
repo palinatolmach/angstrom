@@ -47,3 +47,4 @@ pub mod mintable_mock_erc_20 {
         "../../contracts/out/MintableMockERC20.sol/MintableMockERC20.json"
     );
 }
+

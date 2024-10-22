@@ -302,3 +302,23 @@ struct OverridesForTestAngstrom {
     pub token_in:     Address,
     pub token_out:    Address
 }
+
+#[cfg(test)]
+pub mod test {
+    // test to see proper gas_calculations
+    use std::path::Path;
+
+    use angstrom_types::reth_db_wrapper::RethDbWrapper;
+    use eyre::eyre;
+    use testing_tools::load_reth_db;
+
+    use super::*;
+
+    #[test]
+    fn see_if_default_deploy_works() {
+        let db_path = Path::new("/home/data/reth/db/");
+        let db = load_reth_db(db_path);
+        let res = OrderGasCalculations::new(Arc::new(RethDbWrapper::new(db)));
+        assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain");
+    }
+}
