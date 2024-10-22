@@ -481,7 +481,8 @@ pub mod test {
         }
 
         let mut offsets = std::collections::HashMap::default();
-        offsets.insert(5, 8);
+        // its important to note that the end pc needs to be +1 the wanted
+        offsets.insert(0, 3);
 
         let mut inspector = GasSimulationInspector::new(weth_contract, &offsets);
 
@@ -526,6 +527,6 @@ pub mod test {
         // 	0005    60  PUSH1 0x04 (3)
         // 	0007    36  CALLDATASIZE (2)
 
-        assert_eq!(gas_used, 5);
+        assert_eq!(gas_used, 6);
     }
 }

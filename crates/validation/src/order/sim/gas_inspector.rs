@@ -53,6 +53,7 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
             self.in_flight = Some(pc);
             self.in_flight_start_gas = Some(interp.gas().spent());
         }
+
     }
 
     fn step_end(
@@ -85,4 +86,3 @@ impl<DB: Database> Inspector<DB> for GasSimulationInspector<'_> {
         }
     }
 }
-
