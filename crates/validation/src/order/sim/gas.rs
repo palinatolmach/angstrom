@@ -481,8 +481,7 @@ pub mod test {
         }
 
         let mut offsets = std::collections::HashMap::default();
-
-        offsets.insert(5, 7);
+        offsets.insert(5, 8);
 
         let mut inspector = GasSimulationInspector::new(weth_contract, &offsets);
 
