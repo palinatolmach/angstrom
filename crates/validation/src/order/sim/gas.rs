@@ -146,6 +146,7 @@ where
             .modify_env(|env| {
                 env.cfg.disable_balance_check = true;
                 env.cfg.disable_block_gas_limit = true;
+                env.cfg.disable_block_gas_limit = true;
             })
             .modify_tx_env(f)
             .build();
