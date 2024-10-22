@@ -319,6 +319,9 @@ pub mod test {
         let db_path = Path::new("/home/data/reth/db/");
         let db = load_reth_db(db_path);
         let res = OrderGasCalculations::new(Arc::new(RethDbWrapper::new(db)));
-        assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain {:#?}", res);
+        if let Err(e) = res.as_ref() {
+            println!("{}", e);
+        }
+        assert!(res.is_ok(), "failed to deploy angstrom structure and v4 to chain ");
     }
 }
