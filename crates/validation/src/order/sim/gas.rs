@@ -597,7 +597,7 @@ pub mod test {
         // RETURN (0)
 
         let total_gas = result.result.gas_used();
-        assert_eq!(total_gas, 26);
+        assert_eq!(total_gas, 26 + 21000);
 
         assert_eq!(gas_used, 14);
     }
