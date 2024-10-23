@@ -5281,6 +5281,7 @@ dependencies = [
  "malachite",
  "malachite-q",
  "num-bigfloat",
+ "once_cell",
  "pade",
  "pade-macro",
  "rand",
