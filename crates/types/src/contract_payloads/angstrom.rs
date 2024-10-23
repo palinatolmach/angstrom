@@ -236,7 +236,7 @@ impl AngstromBundle {
         let outcome =
             OrderOutcome { id: user_order.order_id, outcome: OrderFillState::CompleteFill };
         // Get our list of user orders, if we have any
-        user_orders.push(UserOrder::from_internal_order(user_order, &outcome, pair_idx));
+        user_orders.push(UserOrder::from_internal_order(user_order, &outcome, pair_idx as u16));
 
         Ok(Self::new(
             asset_builder.get_asset_array(),
