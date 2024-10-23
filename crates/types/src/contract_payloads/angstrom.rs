@@ -427,7 +427,7 @@ mod test {
 
     #[test]
     fn can_be_constructed() {
-        let result = AngstromBundle::new(vec![], vec![], vec![], vec![], vec![]);
+        let _result = AngstromBundle::new(vec![], vec![], vec![], vec![], vec![]);
     }
 
     #[test]

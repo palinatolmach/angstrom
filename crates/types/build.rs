@@ -20,7 +20,6 @@ fn main() {
 
     let binding = base_dir.clone();
     let this_dir = binding.to_str().unwrap();
-    //panic!("{this_dir}");
 
     let mut contract_dir = base_dir.clone();
     contract_dir.push(CONTRACT_LOCATION);
@@ -82,7 +81,7 @@ pub mod {mod_name} {{
         .unwrap();
 
     for contract_build in sol_macro_invocation {
-        writeln!(&mut f, "{}", contract_build).expect("failed to write sol macro to contract");
+        write!(&mut f, "{}", contract_build).expect("failed to write sol macro to contract");
     }
 }
 

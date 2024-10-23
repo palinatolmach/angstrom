@@ -83,7 +83,6 @@ where
 
         let val = Validator::new(rx, order_validator);
         let client = ValidationClient(tx);
-        let config = ValidationConfig::default();
 
         Self { db, client, underlying: val, config: validation_config }
     }
