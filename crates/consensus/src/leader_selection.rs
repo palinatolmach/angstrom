@@ -300,11 +300,11 @@ mod tests {
             AngstromValidator::new(peers["Bob"], 200),
             AngstromValidator::new(peers["Charlie"], 300),
         ];
-        let mut algo = WeightedRoundRobin::new(validators, BlockNumber::default());
+        let algo = WeightedRoundRobin::new(validators, BlockNumber::default());
 
         algo.save_state().unwrap();
 
-        let mut loaded_algo = WeightedRoundRobin::new(vec![], BlockNumber::default());
+        let loaded_algo = WeightedRoundRobin::new(vec![], BlockNumber::default());
 
         assert_eq!(algo.validators, loaded_algo.validators);
         assert_eq!(algo.new_joiner_penalty_factor, loaded_algo.new_joiner_penalty_factor);

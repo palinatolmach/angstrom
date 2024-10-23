@@ -1,18 +1,13 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
-    marker::PhantomData,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll, Waker},
     time::Duration
 };
 
-use alloy::{
-    primitives::{BlockNumber, Bytes},
-    providers::{network::Network, Provider},
-    transports::Transport
-};
+use alloy::primitives::BlockNumber;
 use angstrom_metrics::ConsensusMetricsWrapper;
 use angstrom_network::{manager::StromConsensusEvent, StromMessage};
 use angstrom_types::{
@@ -26,7 +21,7 @@ use angstrom_types::{
     }
 };
 use angstrom_utils::timer::async_time_fn;
-use futures::{future::BoxFuture, Future, Stream, StreamExt};
+use futures::{future::BoxFuture, Future, Stream};
 use itertools::Itertools;
 use matching_engine::MatchingManager;
 use order_pool::order_storage::OrderStorage;
@@ -154,7 +149,7 @@ impl RoundStateMachine {
                     {
                         // send the quorum pre_proposal to the leader
                         return Some((
-                            Some(self.round_leader.clone()),
+                            Some(self.round_leader),
                             StromMessage::PrePropose(merged_pre_proposal)
                         ))
                     }

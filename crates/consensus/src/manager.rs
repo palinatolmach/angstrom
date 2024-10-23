@@ -1,36 +1,15 @@
-use std::{
-    borrow::BorrowMut,
-    collections::{HashMap, HashSet},
-    marker::PhantomData,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-    thread::current
-};
+use std::{collections::HashSet, marker::PhantomData, sync::Arc};
 
 use alloy::{
-    network::Network,
-    primitives::{bloom, BlockNumber},
-    providers::Provider,
-    transports::Transport
+    network::Network, primitives::BlockNumber, providers::Provider, transports::Transport
 };
 use angstrom_metrics::ConsensusMetricsWrapper;
-use angstrom_network::{manager::StromConsensusEvent, Peer, StromMessage, StromNetworkHandle};
-use angstrom_types::{
-    consensus::{PreProposal, Proposal},
-    contract_payloads::angstrom::TopOfBlockOrder,
-    orders::PoolSolution,
-    primitive::PeerId
-};
-use futures::{pin_mut, FutureExt, Stream, StreamExt};
-use matching_engine::{
-    cfmm::uniswap::pool_providers::provider_adapter::ProviderAdapter, MatchingManager
-};
-use order_pool::{order_storage::OrderStorage, timer::async_time_fn};
+use angstrom_network::{manager::StromConsensusEvent, StromMessage, StromNetworkHandle};
+use futures::StreamExt;
+use order_pool::order_storage::OrderStorage;
 use reth_metrics::common::mpsc::UnboundedMeteredReceiver;
 use reth_provider::{CanonStateNotification, CanonStateNotifications};
-use reth_tasks::TaskSpawner;
-use tokio::{select, task::JoinHandle};
+use tokio::select;
 use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{
