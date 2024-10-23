@@ -132,7 +132,7 @@ impl WeightedRoundRobin {
         // will not have seen the reorg, thus would not have executed the extra rounds
         // after this if statement
         if block_number <= self.block_number {
-            return self.last_proposer
+            return self.last_proposer()
         }
 
         let rounds_to_catchup = (block_number - self.block_number) as usize;
@@ -147,11 +147,15 @@ impl WeightedRoundRobin {
         leader
     }
 
+    // tests
+    #[allow(dead_code)]
     fn remove_validator(&mut self, peer_id: &PeerId) {
         let validator = AngstromValidator::new(*peer_id, 0);
         self.validators.remove(&validator);
     }
 
+    // tests
+    #[allow(dead_code)]
     fn add_validator(&mut self, peer_id: PeerId, voting_power: u64) {
         let mut new_validator = AngstromValidator::new(peer_id, voting_power);
         let total_voting_power: u64 = self.validators.iter().map(|v| v.voting_power).sum();
