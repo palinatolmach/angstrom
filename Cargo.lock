@@ -6589,6 +6589,7 @@ dependencies = [
  "bitvec",
  "bytes",
  "pade-macro",
+ "thiserror",
 ]
 
 [[package]]

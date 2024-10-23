@@ -10,7 +10,7 @@ use alloy_primitives::BlockNumber;
 use angstrom_metrics::ConsensusMetricsWrapper;
 use angstrom_network::{manager::StromConsensusEvent, StromMessage};
 use angstrom_types::{
-    consensus::{Commit, PreProposal, Proposal},
+    consensus::{PreProposal, Proposal},
     orders::{OrderSet, PoolSolution},
     primitive::PeerId,
     sol_bindings::{
@@ -22,7 +22,7 @@ use futures::{future::BoxFuture, Future, Stream};
 use matching_engine::MatchingManager;
 use order_pool::order_storage::OrderStorage;
 use serde::{Deserialize, Serialize};
-use tokio::time::{self, Instant};
+use tokio::time::{self};
 
 use crate::{AngstromValidator, Signer};
 
@@ -122,7 +122,7 @@ impl RoundStateMachine {
     }
 
     pub fn has_quorum(&self, voters: usize) -> bool {
-        voters >= (self.validators.len() * 2) / 3 + 1
+        voters > (self.validators.len() * 2) / 3
     }
 
     pub fn reset_round(&mut self, block: BlockNumber, leader: PeerId) {

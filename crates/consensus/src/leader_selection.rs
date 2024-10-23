@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    default::Default,
     fs::File,
     io::{self, Read, Write}
 };
@@ -74,7 +73,7 @@ impl WeightedRoundRobin {
             .unwrap()
             .clone();
         proposer.priority -= total_voting_power as f64;
-        let proposer_name = proposer.peer_id.clone();
+        let proposer_name = proposer.peer_id;
         self.validators.replace(proposer);
 
         proposer_name
@@ -188,9 +187,9 @@ mod tests {
             ("Charlie".to_string(), PeerId::random())
         ]);
         let validators = vec![
-            AngstromValidator::new(peers["Alice"].clone(), 100),
-            AngstromValidator::new(peers["Bob"].clone(), 200),
-            AngstromValidator::new(peers["Charlie"].clone(), 300),
+            AngstromValidator::new(peers["Alice"], 100),
+            AngstromValidator::new(peers["Bob"], 200),
+            AngstromValidator::new(peers["Charlie"], 300),
         ];
         let mut algo = WeightedRoundRobin::new(validators, BlockNumber::default(), None);
 
@@ -231,8 +230,8 @@ mod tests {
             ("Charlie".to_string(), PeerId::random())
         ]);
         let validators = vec![
-            AngstromValidator::new(peers["Alice"].clone(), 100),
-            AngstromValidator::new(peers["Bob"].clone(), 200),
+            AngstromValidator::new(peers["Alice"], 100),
+            AngstromValidator::new(peers["Bob"], 200),
         ];
         let mut algo = WeightedRoundRobin::new(validators, BlockNumber::default(), None);
 
@@ -253,7 +252,7 @@ mod tests {
         let initial_stats = simulate_rounds(&mut algo, rounds, 1);
         assert_eq!(initial_stats.len(), 2);
 
-        algo.add_validator(peers["Charlie"].clone(), 300);
+        algo.add_validator(peers["Charlie"], 300);
 
         let after_add_stats = simulate_rounds(&mut algo, rounds, 1001);
         assert_eq!(after_add_stats.len(), 3);
@@ -277,15 +276,15 @@ mod tests {
             ("Charlie".to_string(), PeerId::random())
         ]);
         let validators = vec![
-            AngstromValidator::new(peers["Alice"].clone(), 100),
-            AngstromValidator::new(peers["Bob"].clone(), 200),
-            AngstromValidator::new(peers["Charlie"].clone(), 300),
+            AngstromValidator::new(peers["Alice"], 100),
+            AngstromValidator::new(peers["Bob"], 200),
+            AngstromValidator::new(peers["Charlie"], 300),
         ];
-        let mut algo = WeightedRoundRobin::new(validators, BlockNumber::default(), None);
+        let algo = WeightedRoundRobin::new(validators, BlockNumber::default(), None);
 
         algo.save_state().unwrap();
 
-        let mut loaded_algo = WeightedRoundRobin::new(vec![], BlockNumber::default(), None);
+        let loaded_algo = WeightedRoundRobin::new(vec![], BlockNumber::default(), None);
 
         assert_eq!(algo.validators, loaded_algo.validators);
         assert_eq!(algo.new_joiner_penalty_factor, loaded_algo.new_joiner_penalty_factor);
