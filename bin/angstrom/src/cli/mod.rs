@@ -266,7 +266,7 @@ pub async fn initialize_strom_components<Node: FullNodeComponents, AddOns: NodeA
         block_height,
         Arc::new(provider)
     );
-    let _consensus_handle = executor.spawn_critical("consensus", Box::pin(manager.message_loop()));
+    let _consensus_handle = executor.spawn_critical("consensus", Box::pin(manager));
 }
 
 #[derive(Debug, Clone, Default, clap::Args)]

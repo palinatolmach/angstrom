@@ -1,6 +1,7 @@
 use std::{
     borrow::BorrowMut,
     collections::{HashMap, HashSet},
+    future::Future,
     marker::PhantomData,
     pin::Pin,
     sync::{Arc, Mutex},
@@ -107,7 +108,7 @@ where
         }
     }
 
-    async fn on_blockchain_state(&mut self, notification: CanonStateNotification) {
+    fn on_blockchain_state(&mut self, notification: CanonStateNotification) {
         let new_block = notification.tip();
         self.current_height = new_block.block.number;
         let round_leader = self
@@ -119,7 +120,7 @@ where
         self.broadcasted_messages.clear();
     }
 
-    async fn on_network_event(&mut self, event: StromConsensusEvent) {
+    fn on_network_event(&mut self, event: StromConsensusEvent) {
         if self.current_height != event.block_height() {
             tracing::warn!(
                 event_block_height=%event.block_height(),
@@ -187,23 +188,34 @@ where
             ConsensusState::Finalization(Finalization { .. }) => {}
         }
     }
+}
 
-    pub async fn message_loop(mut self) {
-        loop {
-            select! {
-                Some(msg) = self.canonical_block_stream.next() => {
-                    match msg {
-                        Ok(notification) => self.on_blockchain_state(notification).await,
-                        Err(e) => tracing::error!("Error receiving chain state notification: {}", e)
-                    };
-                },
-                Some(msg) = self.strom_consensus_event.next() => {
-                    self.on_network_event(msg).await;
-                },
-                Some(new_state) = self.state_transition.next() => {
-                    self.on_state_start(new_state);
-                },
-            }
+impl<P, TR, N> Future for ConsensusManager<P, TR, N>
+where
+    P: Provider<TR, N> + Send + Sync + Unpin,
+    TR: Transport + Clone + Send + Sync + Unpin,
+    N: Network + Send + Sync + Unpin
+{
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        if let Poll::Ready(Some(msg)) = this.canonical_block_stream.poll_next_unpin(cx) {
+            match msg {
+                Ok(notification) => this.on_blockchain_state(notification),
+                Err(e) => tracing::error!("Error receiving chain state notification: {}", e)
+            };
         }
+
+        if let Poll::Ready(Some(msg)) = this.strom_consensus_event.poll_next_unpin(cx) {
+            this.on_network_event(msg);
+        }
+
+        if let Poll::Ready(Some(new_state)) = this.state_transition.poll_next_unpin(cx) {
+            this.on_state_start(new_state);
+        }
+
+        Poll::Pending
     }
 }
