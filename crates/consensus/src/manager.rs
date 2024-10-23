@@ -1,10 +1,32 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    borrow::BorrowMut,
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+    thread::current
+};
 
-use alloy_primitives::BlockNumber;
+use alloy::{
+    network::Network,
+    primitives::{bloom, BlockNumber},
+    providers::Provider,
+    transports::Transport
+};
 use angstrom_metrics::ConsensusMetricsWrapper;
-use angstrom_network::{manager::StromConsensusEvent, StromMessage, StromNetworkHandle};
-use futures::{FutureExt, StreamExt};
-use order_pool::order_storage::OrderStorage;
+use angstrom_network::{manager::StromConsensusEvent, Peer, StromMessage, StromNetworkHandle};
+use angstrom_types::{
+    consensus::{PreProposal, Proposal},
+    contract_payloads::angstrom::TopOfBlockOrder,
+    orders::PoolSolution,
+    primitive::PeerId
+};
+use futures::{pin_mut, FutureExt, Stream, StreamExt};
+use matching_engine::{
+    cfmm::uniswap::pool_providers::provider_adapter::ProviderAdapter, MatchingManager
+};
+use order_pool::{order_storage::OrderStorage, timer::async_time_fn};
 use reth_metrics::common::mpsc::UnboundedMeteredReceiver;
 use reth_provider::{CanonStateNotification, CanonStateNotifications};
 use reth_tasks::TaskSpawner;
@@ -17,20 +39,18 @@ use crate::{
     AngstromValidator, Signer
 };
 
-pub struct ConsensusManager {
-    current_height:   BlockNumber,
-    leader_selection: WeightedRoundRobin,
-    state_transition: RoundStateMachine,
-
-    /// keeps track of the current round state
-    /// Used to trigger new consensus rounds
+pub struct ConsensusManager<P, TR, N> {
+    current_height:         BlockNumber,
+    leader_selection:       WeightedRoundRobin,
+    state_transition:       RoundStateMachine,
     canonical_block_stream: BroadcastStream<CanonStateNotification>,
-    /// events from the network,
     strom_consensus_event:  UnboundedMeteredReceiver<StromConsensusEvent>,
     network:                StromNetworkHandle,
 
     /// Track broadcasted messages to avoid rebroadcasting
-    broadcasted_messages: HashSet<StromConsensusEvent>
+    broadcasted_messages: HashSet<StromConsensusEvent>,
+    provider:             P,
+    _phantom:             PhantomData<(TR, N)>
 }
 
 pub struct ManagerNetworkDeps {
@@ -49,18 +69,23 @@ impl ManagerNetworkDeps {
     }
 }
 
-impl ConsensusManager {
-    fn new(
+impl<P, TR, N> ConsensusManager<P, TR, N>
+where
+    P: Provider<TR, N> + Send + Sync,
+    TR: Transport + Clone + Send + Sync,
+    N: Network + Send + Sync
+{
+    pub fn new(
         netdeps: ManagerNetworkDeps,
         signer: Signer,
         validators: Vec<AngstromValidator>,
         order_storage: Arc<OrderStorage>,
-        current_height: BlockNumber
+        current_height: BlockNumber,
+        provider: P
     ) -> Self {
         let ManagerNetworkDeps { network, canonical_block_stream, strom_consensus_event } = netdeps;
         let wrapped_broadcast_stream = BroadcastStream::new(canonical_block_stream);
-        let mut leader_selection =
-            WeightedRoundRobin::new(validators.clone(), current_height, None);
+        let mut leader_selection = WeightedRoundRobin::new(validators.clone(), current_height);
         let leader = leader_selection.choose_proposer(current_height).unwrap();
         Self {
             strom_consensus_event,
@@ -72,54 +97,29 @@ impl ConsensusManager {
                 signer,
                 leader,
                 validators.clone(),
-                ConsensusMetricsWrapper::new(),
-                None
+                ConsensusMetricsWrapper::new()
             ),
             network,
             canonical_block_stream: wrapped_broadcast_stream,
-            broadcasted_messages: HashSet::new()
+            broadcasted_messages: HashSet::new(),
+            provider,
+            _phantom: PhantomData
         }
-    }
-
-    pub fn spawn<TP: TaskSpawner>(
-        tp: TP,
-        netdeps: ManagerNetworkDeps,
-        signer: Signer,
-        validators: Vec<AngstromValidator>,
-        order_storage: Arc<OrderStorage>,
-        current_height: BlockNumber
-    ) -> JoinHandle<()> {
-        let manager =
-            ConsensusManager::new(netdeps, signer, validators, order_storage, current_height);
-        let fut = manager.message_loop().boxed();
-        tp.spawn_critical("consensus", fut)
     }
 
     async fn on_blockchain_state(&mut self, notification: CanonStateNotification) {
         let new_block = notification.tip();
-        let new_block_height = new_block.block.number;
-
-        if self.current_height + 1 == new_block_height {
-            // TODO: remove the unwrap; if we go back or choose the same block it's a
-            // problem
-            let round_leader = self
-                .leader_selection
-                .choose_proposer(new_block_height)
-                .unwrap();
-            self.current_height = new_block_height;
-            // TODO: does reset here make sense? Do we care what state we were in?
-            // TODO: what if the transition does not complete before Ethereum fork-choices
-            self.state_transition
-                .reset_round(new_block_height, round_leader);
-            self.broadcasted_messages.clear();
-        } else {
-            tracing::error!("Block height is not sequential, this breaks round robin!");
-            panic!("Unrecoverable consensus error - Block height not sequential");
-        }
+        self.current_height = new_block.block.number;
+        let round_leader = self
+            .leader_selection
+            .choose_proposer(self.current_height)
+            .unwrap();
+        self.state_transition
+            .reset_round(self.current_height, round_leader);
+        self.broadcasted_messages.clear();
     }
 
     async fn on_network_event(&mut self, event: StromConsensusEvent) {
-        // TODO: do we want to ignore all messages for the wrong height?
         if self.current_height != event.block_height() {
             tracing::warn!(
                 event_block_height=%event.block_height(),
@@ -127,7 +127,7 @@ impl ConsensusManager {
                 current_height=%self.current_height,
                 "ignoring event for wrong block",
             );
-            return;
+            return
         }
 
         if self.state_transition.my_id() == event.payload_source() {
@@ -137,17 +137,20 @@ impl ConsensusManager {
                 message_type=%event.message_type(),
                 "ignoring event that we sent to node",
             );
-            return;
+            return
         }
 
-        // do we want to transition first and the send a message?
         if !self.broadcasted_messages.contains(&event) {
             self.network.broadcast_message(event.clone().into());
             self.broadcasted_messages.insert(event.clone());
         }
 
-        if let Some(msg) = self.state_transition.on_strom_message(event.clone()) {
-            self.network.broadcast_message(msg);
+        if let Some((peer_id, msg)) = self.state_transition.on_strom_message(event.clone()) {
+            if let Some(peer_id) = peer_id {
+                self.network.send_message(peer_id, msg);
+            } else {
+                self.network.broadcast_message(msg);
+            }
         }
     }
 

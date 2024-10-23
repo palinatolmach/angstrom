@@ -65,9 +65,6 @@ matching-engine = { path = "./crates/matching-engine/" }
 contract-bindings = { path = "./crates/contract-bindings/" }
 eyre = "0.6.12"
 
-# BLS library
-blsful = "2.5.7"
-
 ## async
 async-trait = "0.1.68"
 futures = "0.3.26"
@@ -155,7 +152,6 @@ alloy-rpc-types-txpool = { version = "0.4.2", default-features = false }
 alloy-serde = { version = "0.4.2", default-features = false }
 alloy-rpc-types-engine = { version = "0.4.2", default-features = false }
 alloy-rpc-types-eth = { version = "0.4.2", default-features = false }
-# alloy-rpc-types-trace = { version = "0.4.2", default-features = false }
 alloy-genesis = { version = "0.4.2", default-features = false }
 alloy-node-bindings = { version = "0.4.2", default-features = false }
 alloy-provider = { version = "0.4.2", default-features = false, features = [

@@ -7,7 +7,6 @@ edition.workspace = true
 base64 = "0.22.1"
 bitmaps.workspace = true
 reth-network-peers = { workspace = true, features = ["secp256k1"] }
-blsful.workspace = true
 bytes = "1.4"
 pade.workspace = true
 pade-macro.workspace = true
