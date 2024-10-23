@@ -360,6 +360,7 @@ pub mod test {
         signers::{local::LocalSigner, Signer, SignerSync}
     };
     use angstrom_types::{
+        contract_payloads::angstrom::UserOrder,
         reth_db_wrapper::RethDbWrapper,
         sol_bindings::{
             grouped_orders::StandingVariants,
@@ -458,6 +459,10 @@ pub mod test {
             is_bid: true,
             ..Default::default()
         };
+
+        let outcome =
+            OrderOutcome { id: user_order.order_id, outcome: OrderFillState::CompleteFill };
+        let encode = UserOrder::from_internal_order(&user_order, outcome, 0).pade_encode();
 
         // ensure user address has proper funds
         let order_gas = gas_calculations
