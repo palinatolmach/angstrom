@@ -329,7 +329,7 @@ impl RoundStateMachine {
                         finalization.proposal = Some(proposal.clone());
                         // TODO: use the actual pools
                         let pools = HashMap::new();
-                        let bundle = AngstromBundle::from_proposal(&proposal, &pools).unwrap();
+                        let _bundle = AngstromBundle::from_proposal(&proposal, &pools).unwrap();
                     }
                     Err(err) => {
                         // Handle the error from build_proposal

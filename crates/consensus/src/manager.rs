@@ -28,7 +28,7 @@ pub struct ConsensusManager<P, TR, N> {
 
     /// Track broadcasted messages to avoid rebroadcasting
     broadcasted_messages: HashSet<StromConsensusEvent>,
-    provider:             P,
+    _provider:            P,
     _phantom:             PhantomData<(TR, N)>
 }
 
@@ -60,7 +60,7 @@ where
         validators: Vec<AngstromValidator>,
         order_storage: Arc<OrderStorage>,
         current_height: BlockNumber,
-        provider: P
+        _provider: P
     ) -> Self {
         let ManagerNetworkDeps { network, canonical_block_stream, strom_consensus_event } = netdeps;
         let wrapped_broadcast_stream = BroadcastStream::new(canonical_block_stream);
@@ -81,7 +81,7 @@ where
             network,
             canonical_block_stream: wrapped_broadcast_stream,
             broadcasted_messages: HashSet::new(),
-            provider,
+            _provider,
             _phantom: PhantomData
         }
     }
@@ -137,7 +137,7 @@ where
         match new_stat {
             // means we transitioned from commit phase to bid submission.
             // nothing much to do here. we just wait sometime to accumulate orders
-            ConsensusState::BidSubmission(BidSubmission { pre_proposals, .. }) => {}
+            ConsensusState::BidSubmission(BidSubmission { .. }) => {}
             // means we transitioned from bid submission to aggregation, therefore we broadcast our
             // pre-proposal to the network
             ConsensusState::BidAggregation(BidAggregation { pre_proposals, .. }) => {
