@@ -51,13 +51,13 @@ library HookBufferLib {
                 hash := keccak256(contentOffset, hookDataLength)
                 reader := add(reader, hookDataLength)
 
-                // Load hook address from memory.
+                // Load hook address from memory ensuring upper bytes are cleared.
                 // If `hookDataLength` < 20 dirty lower bytes will become part of the hook address.
                 // This could lead to an unexpected hook address being called on behalf of the
                 // signer, however this can only occur if: 1. Said signer signs a malformed order
                 // struct (hook data length < 20) and 2. The submitting node decides to maliciously
                 // include the order despite it violating the encoding specification.
-                let hookAddr := mload(add(memPtr, 0x44))
+                let hookAddr := shr(96, mload(add(memPtr, add(0x44, 12))))
 
                 // Setup memory for full call.
                 mstore(memPtr, HOOK_SELECTOR_LEFT_ALIGNED) // 0x00:0x04 selector
