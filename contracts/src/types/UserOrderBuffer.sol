@@ -35,9 +35,8 @@ library UserOrderBufferLib {
 
     uint256 internal constant VARIANT_MAP_BYTES = 1;
     /// @dev Destination offset for direct calldatacopy of 4-byte ref ID (therefore not word aligned).
-    uint256 internal constant REF_ID_MEM_OFFSET = 0x3c;
+    uint256 internal constant REF_ID_MEM_OFFSET = 0x20;
     uint256 internal constant REF_ID_BYTES = 4;
-
     uint256 internal constant NONCE_MEM_OFFSET = 0x160;
     uint256 internal constant NONCE_BYTES = 8;
     uint256 internal constant DEADLINE_MEM_OFFSET = 0x180;
@@ -122,7 +121,9 @@ library UserOrderBufferLib {
             variantMap := byte(0, calldataload(reader))
             reader := add(reader, VARIANT_MAP_BYTES)
             // Copy `refId` from calldata directly to memory.
-            calldatacopy(add(self, REF_ID_MEM_OFFSET), reader, REF_ID_BYTES)
+            calldatacopy(
+                add(self, add(REF_ID_MEM_OFFSET, sub(0x20, REF_ID_BYTES))), reader, REF_ID_BYTES
+            )
             // Advance reader.
             reader := add(reader, REF_ID_BYTES)
         }

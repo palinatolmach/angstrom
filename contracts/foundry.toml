@@ -39,7 +39,7 @@ depth = 50
 runs = 50
 
 [profile.light-fuzz.invariant]
-runs = 10
+runs = 40
 depth = 100
 
 [profile.heavy-fuzz.invariant]
