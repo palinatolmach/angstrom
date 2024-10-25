@@ -7,6 +7,7 @@ use alloy::{
     sol_types::SolEvent,
     transports::Transport
 };
+use alloy_primitives::Log;
 use amms::{
     amm::{
         consts::U256_1,
@@ -14,7 +15,6 @@ use amms::{
     },
     errors::{AMMError, EventLogError}
 };
-use reth_primitives::Log;
 use thiserror::Error;
 use uniswap_v3_math::{
     error::UniswapV3MathError,

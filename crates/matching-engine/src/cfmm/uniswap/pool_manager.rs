@@ -22,7 +22,6 @@ use arraydeque::ArrayDeque;
 use eyre::Error;
 use futures_util::{stream::BoxStream, StreamExt};
 use itertools::Itertools;
-use reth_primitives::Log;
 use thiserror::Error;
 use tokio::{
     sync::{
