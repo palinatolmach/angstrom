@@ -20,7 +20,7 @@ library ConfigEntryLib {
     }
 
     function tickSpacing(ConfigEntry self) internal pure returns (int24 spacing) {
-        assembly {
+        assembly ("memory-safe") {
             spacing := and(TICK_SPACING_MASK, shr(TICK_SPACING_OFFSET, self))
         }
     }

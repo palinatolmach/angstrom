@@ -38,7 +38,7 @@ library TickLib {
     }
 
     function compress(int24 tick, int24 tickSpacing) internal pure returns (int24 compressed) {
-        assembly {
+        assembly ("memory-safe") {
             compressed := sub(sdiv(tick, tickSpacing), slt(smod(tick, tickSpacing), 0))
         }
     }
@@ -50,7 +50,7 @@ library TickLib {
         pure
         returns (int24 normalized)
     {
-        assembly {
+        assembly ("memory-safe") {
             normalized :=
                 mul(sub(sdiv(tick, tickSpacing), slt(smod(tick, tickSpacing), 0)), tickSpacing)
         }

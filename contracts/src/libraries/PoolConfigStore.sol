@@ -180,7 +180,7 @@ library PoolConfigStoreLib {
         returns (int24 tickSpacing, uint24 feeInE6)
     {
         ConfigEntry entry;
-        assembly {
+        assembly ("memory-safe") {
             // Copy from store into scratch space.
             extcodecopy(self, 0x00, add(STORE_HEADER_SIZE, mul(ENTRY_SIZE, index)), ENTRY_SIZE)
             // Zero out entry if keys do not match.

@@ -156,7 +156,7 @@ contract Angstrom is
         _invalidateOrderHash(orderHash, from);
 
         address to = buffer.recipient;
-        assembly {
+        assembly ("memory-safe") {
             to := or(mul(iszero(to), from), to)
         }
         _settleOrderIn(
@@ -242,7 +242,7 @@ contract Angstrom is
 
         // Push before hook as a potential loan.
         address to = buffer.recipient;
-        assembly {
+        assembly ("memory-safe") {
             to := or(mul(iszero(to), from), to)
         }
         _settleOrderOut(to, buffer.assetOut, amountOut, variantMap.useInternal());

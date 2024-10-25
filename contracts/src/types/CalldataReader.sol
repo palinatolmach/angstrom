@@ -36,7 +36,7 @@ library CalldataReaderLib {
     error ReaderNotAtEnd();
 
     function from(bytes calldata data) internal pure returns (CalldataReader reader) {
-        assembly {
+        assembly ("memory-safe") {
             reader := data.offset
         }
     }

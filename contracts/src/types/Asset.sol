@@ -73,25 +73,25 @@ library AssetLib {
     }
 
     function addr(Asset self) internal pure returns (address value) {
-        assembly {
+        assembly ("memory-safe") {
             value := shr(96, calldataload(add(self, ADDR_OFFSET)))
         }
     }
 
     function take(Asset self) internal pure returns (uint128 amount) {
-        assembly {
+        assembly ("memory-safe") {
             amount := shr(128, calldataload(add(self, TAKE_OFFSET)))
         }
     }
 
     function save(Asset self) internal pure returns (uint128 amount) {
-        assembly {
+        assembly ("memory-safe") {
             amount := shr(128, calldataload(add(self, SAVE_OFFSET)))
         }
     }
 
     function settle(Asset self) internal pure returns (uint128 amount) {
-        assembly {
+        assembly ("memory-safe") {
             amount := shr(128, calldataload(add(self, SETTLE_OFFSET)))
         }
     }

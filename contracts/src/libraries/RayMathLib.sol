@@ -17,7 +17,7 @@ library RayMathLib {
     }
 
     function invRayUnchecked(uint256 x) internal pure returns (uint256 y) {
-        assembly {
+        assembly ("memory-safe") {
             y := div(RAY_2, x)
         }
     }
