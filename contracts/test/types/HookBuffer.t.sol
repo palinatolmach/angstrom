@@ -64,9 +64,10 @@ contract HookBufferTest is BaseTest {
         uint256 brutalizeSeed
     ) external {
         CalldataReader reader = CalldataReaderLib.from(data);
+
+        brutalizeSeed = _brutalize(brutalizeSeed, 20);
         (CalldataReader outReader, HookBuffer hookBuffer, bytes32 hash) =
             HookBufferLib.readFrom(reader, false);
-        _brutalize(brutalizeSeed, 20);
         assertEq(hash, keccak256(abi.encodePacked(address(recorder), hookPayload)), "wrong hash");
         assertEq(reader.offset() + 23 + hookPayload.length, outReader.offset());
 
@@ -82,6 +83,7 @@ contract HookBufferTest is BaseTest {
                 hookPayload
             )
         );
+        brutalizeSeed = _brutalize(brutalizeSeed, 20);
         hookBuffer.tryTrigger(from);
 
         assertEq(recorder.callCount(), callCount + 1);
@@ -139,15 +141,11 @@ contract HookBufferTest is BaseTest {
         uint256 brutalizeSeed
     ) external {
         CalldataReader reader = CalldataReaderLib.from(data);
+        brutalizeSeed = _brutalize(brutalizeSeed, 20);
         (CalldataReader outReader, HookBuffer hookBuffer, bytes32 hash) =
             HookBufferLib.readFrom(reader, false);
         assertEq(hash, keccak256(abi.encodePacked(address(smol), hookPayload)), "wrong hash");
         assertEq(reader.offset() + 23 + hookPayload.length, outReader.offset());
-
-        _brutalize(brutalizeSeed, 20);
-        assembly ("memory-safe") {
-            mstore(0x00, EXPECTED_HOOK_RETURN_MAGIC)
-        }
 
         vm.expectCall(
             address(smol),
@@ -159,6 +157,11 @@ contract HookBufferTest is BaseTest {
                 hookPayload
             )
         );
+
+        brutalizeSeed = _brutalize(brutalizeSeed, 20);
+        assembly ("memory-safe") {
+            mstore(0x00, EXPECTED_HOOK_RETURN_MAGIC)
+        }
         hookBuffer.tryTrigger(from);
     }
 }

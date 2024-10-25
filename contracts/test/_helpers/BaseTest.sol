@@ -228,7 +228,11 @@ contract BaseTest is Test, HookDeployer {
         }
     }
 
-    function _brutalize(uint256 seed, uint256 freeWordsToBrutalize) internal pure {
+    function _brutalize(uint256 seed, uint256 freeWordsToBrutalize)
+        internal
+        pure
+        returns (uint256 newBrutalizeSeed)
+    {
         assembly ("memory-safe") {
             mstore(0x00, seed)
             let free := mload(0x40)
@@ -239,6 +243,7 @@ contract BaseTest is Test, HookDeployer {
             }
             mstore(0x20, keccak256(0x00, 0x20))
             mstore(0x00, keccak256(0x10, 0x20))
+            newBrutalizeSeed := keccak256(0x00, 0x40)
         }
     }
 
