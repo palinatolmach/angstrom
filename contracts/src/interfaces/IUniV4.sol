@@ -6,12 +6,15 @@ import {Slot0} from "v4-core/src/types/Slot0.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 
+/// @dev Library/Interface that wraps Uniswap V4's `extsload` to add view calls. NOTE: While
+/// technically a library, it behaves like an interface which is why it's here, under `/interfaces`.
 library IUniV4 {
     using IUniV4 for IPoolManager;
     using TickLib for uint256;
 
     error ExtsloadFailed();
 
+    /// @dev Selector of `IPoolManager.extsload`.
     uint256 internal constant EXTSLOAD_SELECTOR = 0x1e2eaeaf;
 
     uint256 private constant _OWNER_SLOT = 0;
