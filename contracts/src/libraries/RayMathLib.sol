@@ -21,12 +21,4 @@ library RayMathLib {
             y := div(RAY_2, x)
         }
     }
-
-    function wadToRay(uint256 x) internal pure returns (uint256) {
-        return x * 1e9;
-    }
-
-    function rayToWad(uint256 x) internal pure returns (uint256) {
-        return x / 1e9;
-    }
 }
