@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     hash::Hash,
+    ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc
@@ -12,7 +13,7 @@ use alloy::{
     primitives::{Address, BlockNumber},
     rpc::types::{eth::Filter, Block}
 };
-use alloy_primitives::Log;
+use alloy_primitives::{Log, B256};
 use amms::errors::EventLogError;
 use angstrom_types::matching::{
     uniswap::{LiqRange, PoolSnapshot},
@@ -33,7 +34,8 @@ use tokio::{
 
 use super::pool::SwapSimulationError;
 use crate::cfmm::uniswap::{
-    pool::EnhancedUniswapPool, pool_data_loader::PoolDataLoader,
+    pool::EnhancedUniswapPool,
+    pool_data_loader::{DataLoader, PoolDataLoader},
     pool_providers::PoolManagerProvider
 };
 
@@ -105,7 +107,7 @@ where
         // it should crash given that no pools makes no sense
         let pool = self.pools.values().next().unwrap();
         let pool = pool.read().await;
-        Filter::new().event_signature(pool.sync_on_event_signatures())
+        Filter::new().event_signature(pool.event_signatures())
     }
 
     /// Listens to new blocks and handles state changes, sending the pool
@@ -197,14 +199,7 @@ where
                     )
                     .await?;
 
-                // TODO! fix it somehow ehre
-                // let logs_by_address = logs
-                //     .into_iter()
-                //     .map(|log| (log.address.into(), log))
-                //     .into_group_map();
-
-                // TODO: this might be a problem
-                let logs_by_address: HashMap<A, Vec<Log>> = HashMap::new();
+                let logs_by_address = Loader::group_logs(logs);
 
                 for (addr, logs) in logs_by_address {
                     if logs.is_empty() {

@@ -4,17 +4,11 @@ use alloy::{
     network::Network,
     primitives::{aliases::I24, Address, BlockNumber, B256, I256, U256},
     providers::Provider,
-    sol_types::SolEvent,
+    sol,
     transports::Transport
 };
 use alloy_primitives::Log;
-use amms::{
-    amm::{
-        consts::U256_1,
-        uniswap_v3::{IUniswapV3Pool, Info}
-    },
-    errors::{AMMError, EventLogError}
-};
+use amms::errors::{AMMError, EventLogError};
 use thiserror::Error;
 use uniswap_v3_math::{
     error::UniswapV3MathError,
@@ -23,8 +17,7 @@ use uniswap_v3_math::{
 
 use crate::cfmm::uniswap::{
     pool_data_loader::{
-        DataLoader, IGetUniswapV3TickDataBatchRequest, PoolDataLoader, TicksWithBlock,
-        UniswapV3TickData
+        DataLoader, IUniswapV3Pool, ModifyPositionEvent, PoolDataLoader, UniswapTickData
     },
     pool_manager::PoolManagerError
 };
@@ -38,8 +31,17 @@ struct SwapResult {
     tick:            i32
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct TickInfo {
+    pub liquidity_gross: u128,
+    pub liquidity_net:   i128,
+    pub initialized:     bool
+}
+
 // at around 190 is when "max code size exceeded" comes up
 const MAX_TICKS_PER_REQUEST: u16 = 150;
+
+pub const U256_1: U256 = U256::from_limbs([1, 0, 0, 0]);
 
 #[derive(Debug, Clone, Default)]
 pub struct EnhancedUniswapPool<Loader: PoolDataLoader<A> = DataLoader<Address>, A = Address> {
@@ -57,7 +59,7 @@ pub struct EnhancedUniswapPool<Loader: PoolDataLoader<A> = DataLoader<Address>, 
     pub tick:               i32,
     pub tick_spacing:       i32,
     pub tick_bitmap:        HashMap<i16, U256>,
-    pub ticks:              HashMap<i32, Info>,
+    pub ticks:              HashMap<i32, TickInfo>,
     pub _phantom:           PhantomData<A>
 }
 
@@ -102,7 +104,7 @@ where
         num_ticks: u16,
         block_number: Option<BlockNumber>,
         provider: Arc<P>
-    ) -> Result<(Vec<UniswapV3TickData>, U256), AMMError>
+    ) -> Result<(Vec<UniswapTickData>, U256), AMMError>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
@@ -189,7 +191,7 @@ where
             .for_each(|tick| {
                 self.ticks.insert(
                     tick.tick,
-                    Info {
+                    TickInfo {
                         initialized:     tick.initialized,
                         liquidity_gross: tick.liquidity_gross,
                         liquidity_net:   tick.liquidity_net
@@ -402,10 +404,10 @@ where
     }
 
     fn sync_swap_with_sim(&mut self, log: Log) -> Result<(), PoolManagerError> {
-        let swap_event = IUniswapV3Pool::Swap::decode_log(&log, true)?;
+        let swap_event = Loader::decode_swap_event(&log)?;
 
         tracing::trace!(pool_tick = ?self.tick, pool_price = ?self.sqrt_price, pool_liquidity = ?self.liquidity, pool_address = ?self.data_loader.address(), "pool before");
-        tracing::debug!(swap_tick=swap_event.tick.as_i32(), swap_price=?swap_event.sqrtPriceX96, swap_liquidity=?swap_event.liquidity, swap_amount0=?swap_event.amount0, swap_amount1=?swap_event.amount1, "swap event");
+        tracing::debug!(swap_tick=swap_event.tick, swap_price=?swap_event.sqrt_price_x96, swap_liquidity=?swap_event.liquidity, swap_amount0=?swap_event.amount0, swap_amount1=?swap_event.amount1, "swap event");
 
         let combinations = [
             (self.token_b, swap_event.amount1),
@@ -416,7 +418,7 @@ where
 
         let mut simulation_failed = true;
         for (token_in, amount_in) in combinations.iter() {
-            let sqrt_price_limit_x96 = Some(U256::from(swap_event.sqrtPriceX96));
+            let sqrt_price_limit_x96 = Some(U256::from(swap_event.sqrt_price_x96));
             if let Ok((amount0, amount1)) =
                 self.simulate_swap(*token_in, *amount_in, sqrt_price_limit_x96)
             {
@@ -436,8 +438,8 @@ where
                 pool_price = ?self.sqrt_price,
                 pool_liquidity = ?self.liquidity,
                 pool_tick = ?self.tick,
-                swap_price = ?swap_event.sqrtPriceX96,
-                swap_tick = swap_event.tick.as_i32(),
+                swap_price = ?swap_event.sqrt_price_x96,
+                swap_tick = swap_event.tick,
                 swap_liquidity = ?swap_event.liquidity,
                 swap_amount0 = ?swap_event.amount0,
                 swap_amount1 = ?swap_event.amount1,
@@ -452,14 +454,10 @@ where
     }
 
     pub fn sync_from_log(&mut self, log: Log) -> Result<(), EventLogError> {
-        let event_signature = log.topics()[0];
-
-        if event_signature == IUniswapV3Pool::Burn::SIGNATURE_HASH {
-            self.sync_from_burn_log(log)?;
-        } else if event_signature == IUniswapV3Pool::Mint::SIGNATURE_HASH {
-            self.sync_from_mint_log(log)?;
-        } else if event_signature == IUniswapV3Pool::Swap::SIGNATURE_HASH {
+        if Loader::is_swap_event(&log) {
             self._sync_from_swap_log(log)?;
+        } else if Loader::is_modify_position_event(&log) {
+            self.sync_from_modify_position(log)?;
         } else {
             Err(EventLogError::InvalidEventSignature)?
         }
@@ -467,40 +465,34 @@ where
         Ok(())
     }
 
-    pub fn sync_from_burn_log(&mut self, log: Log) -> Result<(), alloy::dyn_abi::Error> {
-        let burn_event = IUniswapV3Pool::Burn::decode_log(&log, true)?;
+    pub fn sync_from_modify_position(&mut self, log: Log) -> Result<(), alloy::dyn_abi::Error> {
+        let modify_position_event = Loader::decode_modify_position_event(&log)?;
+        let ModifyPositionEvent { tick_lower, tick_upper, liquidity_delta, .. } =
+            modify_position_event;
 
-        self.modify_position(
-            burn_event.tickLower.as_i32(),
-            burn_event.tickUpper.as_i32(),
-            -(burn_event.amount as i128)
-        );
+        self.update_position(tick_lower, tick_upper, liquidity_delta);
 
-        tracing::debug!(?burn_event, address = ?self.data_loader.address(), sqrt_price = ?self.sqrt_price, liquidity = ?self.liquidity, tick = ?self.tick, "burn event");
+        if liquidity_delta != 0 {
+            if self.tick > tick_lower && self.tick < tick_upper {
+                self.liquidity = if liquidity_delta < 0 {
+                    self.liquidity - ((-liquidity_delta) as u128)
+                } else {
+                    self.liquidity + (liquidity_delta as u128)
+                }
+            }
+        }
 
-        Ok(())
-    }
-
-    pub fn sync_from_mint_log(&mut self, log: Log) -> Result<(), alloy::dyn_abi::Error> {
-        let mint_event = IUniswapV3Pool::Mint::decode_log(&log, true)?;
-
-        self.modify_position(
-            mint_event.tickLower.as_i32(),
-            mint_event.tickUpper.as_i32(),
-            mint_event.amount as i128
-        );
-
-        tracing::debug!(?mint_event, address = ?self.data_loader.address(), sqrt_price = ?self.sqrt_price, liquidity = ?self.liquidity, tick = ?self.tick, "mint event");
+        tracing::debug!(?modify_position_event, address = ?self.data_loader.address(), sqrt_price = ?self.sqrt_price, liquidity = ?self.liquidity, tick = ?self.tick, "modify position event");
 
         Ok(())
     }
 
     pub fn _sync_from_swap_log(&mut self, log: Log) -> Result<(), alloy::sol_types::Error> {
-        let swap_event = IUniswapV3Pool::Swap::decode_log(&log, true)?;
+        let swap_event = Loader::decode_swap_event(&log)?;
 
-        self.sqrt_price = U256::from(swap_event.sqrtPriceX96);
+        self.sqrt_price = U256::from(swap_event.sqrt_price_x96);
         self.liquidity = swap_event.liquidity;
-        self.tick = swap_event.tick.as_i32();
+        self.tick = swap_event.tick;
 
         tracing::debug!(?swap_event, address = ?self.data_loader.address(), sqrt_price = ?self.sqrt_price, liquidity = ?self.liquidity, tick = ?self.tick, "swap event");
 
@@ -541,26 +533,8 @@ where
         !(self.token_a.is_zero() || self.token_b.is_zero())
     }
 
-    pub fn modify_position(&mut self, tick_lower: i32, tick_upper: i32, liquidity_delta: i128) {
-        self.update_position(tick_lower, tick_upper, liquidity_delta);
-
-        if liquidity_delta != 0 {
-            if self.tick > tick_lower && self.tick < tick_upper {
-                self.liquidity = if liquidity_delta < 0 {
-                    self.liquidity - ((-liquidity_delta) as u128)
-                } else {
-                    self.liquidity + (liquidity_delta as u128)
-                }
-            }
-        }
-    }
-
-    pub(crate) fn sync_on_event_signatures(&self) -> Vec<B256> {
-        vec![
-            IUniswapV3Pool::Swap::SIGNATURE_HASH,
-            IUniswapV3Pool::Mint::SIGNATURE_HASH,
-            IUniswapV3Pool::Burn::SIGNATURE_HASH,
-        ]
+    pub(crate) fn event_signatures(&self) -> Vec<B256> {
+        Loader::event_signatures()
     }
 
     pub fn update_position(&mut self, tick_lower: i32, tick_upper: i32, liquidity_delta: i128) {
@@ -590,7 +564,7 @@ where
     }
 
     pub fn update_tick(&mut self, tick: i32, liquidity_delta: i128, upper: bool) -> bool {
-        let info = self.ticks.entry(tick).or_insert_with(Info::default);
+        let info = self.ticks.entry(tick).or_insert_with(TickInfo::default);
 
         let liquidity_gross_before = info.liquidity_gross;
 
@@ -755,7 +729,7 @@ mod test {
         assert_eq!(
             pool.sqrt_price,
             U256::from_str("1597878859828850322653524929880487").unwrap(),
-            "Incorrect sqrtPriceX96"
+            "Incorrect sqrt_price_x96"
         );
         assert_eq!(pool.liquidity, 2694411943070307563, "Incorrect liquidity");
         assert_eq!(pool.tick, 198247, "Incorrect tick");
@@ -788,7 +762,7 @@ mod test {
         // owner: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88, tickLower: 195090,
         // tickUpper: 195540, amount: 136670924187209102, amount0: 0, amount1:
         // 53560594103808093362
-        pool.sync_from_burn_log(AlloyLog {
+        pool.sync_from_log(AlloyLog {
             address: address!("88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"),
             data: LogData::new(
                 vec![

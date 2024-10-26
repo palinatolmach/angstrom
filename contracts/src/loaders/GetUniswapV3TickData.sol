@@ -1,14 +1,13 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {TickMath} from "../../lib/v4-core/src/libraries/TickMath.sol";
+
 /**
  * @dev This contract is not meant to be deployed. Instead, use a static call with the
  *       deployment bytecode as payload.
  */
 contract GetUniswapV3TickData {
-    int24 internal constant MIN_TICK = -887272;
-    int24 internal constant MAX_TICK = -MIN_TICK;
-
     struct TickData {
         bool initialized;
         int24 tick;
@@ -43,15 +42,15 @@ contract GetUniswapV3TickData {
 
             //Make sure not to overshoot the max/min tick
             //If we do, break the loop, and set the last initialized tick to the max/min tick=
-            if (nextTick < MIN_TICK) {
-                nextTick = MIN_TICK;
+            if (nextTick < TickMath.MIN_TICK) {
+                nextTick = TickMath.MIN_TICK;
                 tickData[counter].initialized = initialized;
                 tickData[counter].tick = nextTick;
                 tickData[counter].liquidityGross = liquidityGross;
                 tickData[counter].liquidityNet = liquidityNet;
                 break;
-            } else if (nextTick > MAX_TICK) {
-                nextTick = MIN_TICK;
+            } else if (nextTick > TickMath.MAX_TICK) {
+                nextTick = TickMath.MIN_TICK;
                 tickData[counter].initialized = initialized;
                 tickData[counter].tick = nextTick;
                 tickData[counter].liquidityGross = liquidityGross;
