@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IPoolManager} from "../../lib/v4-core/src/interfaces/IPoolManager.sol";
 import {TickMath} from "../../lib/v4-core/src/libraries/TickMath.sol";
-import {PoolKey} from "../../lib/v4-core/src/types/PoolKey.sol";
+import {PoolId} from "../../lib/v4-core/src/types/PoolId.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 
 contract GetUniswapV4TickData {
@@ -20,8 +20,8 @@ contract GetUniswapV4TickData {
     }
 
     constructor(
+        PoolId poolId,
         address poolManager,
-        PoolKey memory poolKey,
         bool zeroForOne,
         int24 currentTick,
         uint16 numTicks,
@@ -34,15 +34,11 @@ contract GetUniswapV4TickData {
 
         while (counter < numTicks) {
             (bool initialized, int24 nextTick) = zeroForOne
-                ? IUniV4.getNextTickLt(
-                    IPoolManager(poolManager), poolKey.toId(), tickSpacing, currentTick
-                )
-                : IUniV4.getNextTickGt(
-                    IPoolManager(poolManager), poolKey.toId(), tickSpacing, currentTick
-                );
+                ? IUniV4.getNextTickLt(IPoolManager(poolManager), poolId, tickSpacing, currentTick)
+                : IUniV4.getNextTickGt(IPoolManager(poolManager), poolId, tickSpacing, currentTick);
 
             (uint128 liquidityGross, int128 liquidityNet) =
-                IUniV4.getTickLiquidity(IPoolManager(poolManager), poolKey.toId(), nextTick);
+                IUniV4.getTickLiquidity(IPoolManager(poolManager), poolId, nextTick);
 
             //Make sure not to overshoot the max/min tick
             //If we do, break the loop, and set the last initialized tick to the max/min tick=

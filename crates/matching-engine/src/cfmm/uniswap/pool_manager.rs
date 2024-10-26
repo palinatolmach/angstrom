@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     hash::Hash,
-    ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc
@@ -13,7 +12,7 @@ use alloy::{
     primitives::{Address, BlockNumber},
     rpc::types::{eth::Filter, Block}
 };
-use alloy_primitives::{Log, B256};
+use alloy_primitives::Log;
 use amms::errors::EventLogError;
 use angstrom_types::matching::{
     uniswap::{LiqRange, PoolSnapshot},
@@ -22,7 +21,6 @@ use angstrom_types::matching::{
 use arraydeque::ArrayDeque;
 use eyre::Error;
 use futures_util::{stream::BoxStream, StreamExt};
-use itertools::Itertools;
 use thiserror::Error;
 use tokio::{
     sync::{
@@ -34,8 +32,7 @@ use tokio::{
 
 use super::pool::SwapSimulationError;
 use crate::cfmm::uniswap::{
-    pool::EnhancedUniswapPool,
-    pool_data_loader::{DataLoader, PoolDataLoader},
+    pool::EnhancedUniswapPool, pool_data_loader::PoolDataLoader,
     pool_providers::PoolManagerProvider
 };
 

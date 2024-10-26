@@ -4,7 +4,6 @@ use alloy::{
     network::Network,
     primitives::{aliases::I24, Address, BlockNumber, B256, I256, U256},
     providers::Provider,
-    sol,
     transports::Transport
 };
 use alloy_primitives::Log;
@@ -16,9 +15,8 @@ use uniswap_v3_math::{
 };
 
 use crate::cfmm::uniswap::{
-    pool_data_loader::{
-        DataLoader, IUniswapV3Pool, ModifyPositionEvent, PoolDataLoader, UniswapTickData
-    },
+    i32_to_i24,
+    pool_data_loader::{DataLoader, ModifyPositionEvent, PoolDataLoader, TickData},
     pool_manager::PoolManagerError
 };
 
@@ -97,39 +95,26 @@ where
         self.data_loader.address()
     }
 
-    pub async fn get_tick_data_batch_request<P, T, N>(
+    async fn get_tick_data_batch_request<P, T, N>(
         &self,
-        tick_start: i32,
+        tick_start: I24,
         zero_for_one: bool,
         num_ticks: u16,
         block_number: Option<BlockNumber>,
         provider: Arc<P>
-    ) -> Result<(Vec<UniswapTickData>, U256), AMMError>
+    ) -> Result<(Vec<TickData>, U256), AMMError>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
         N: Network
     {
-        let current_tick = I24::try_from(tick_start).map_err(|_| {
-            AMMError::ABICodecError(alloy::dyn_abi::Error::InvalidPropertyDefinition(format!(
-                "Current tick provided was out of range: {}",
-                tick_start
-            )))
-        })?;
-        let tick_spacing = I24::try_from(self.tick_spacing).map_err(|_| {
-            AMMError::ABICodecError(alloy::dyn_abi::Error::InvalidPropertyDefinition(format!(
-                "Tick spacing out of range: {}",
-                self.tick_spacing
-            )))
-        })?;
-
         let (tick_data, block_number) = self
             .data_loader
             .load_tick_data(
-                current_tick,
+                tick_start,
                 zero_for_one,
                 num_ticks,
-                tick_spacing,
+                i32_to_i24(self.tick_spacing),
                 block_number,
                 provider.clone()
             )
@@ -168,7 +153,8 @@ where
             let ticks_to_fetch = remaining_ticks.min(MAX_TICKS_PER_REQUEST);
             let (mut batch_ticks, _) = self
                 .get_tick_data_batch_request(
-                    start_tick,
+                    // safe because we pull the ticks form chain where they are i24
+                    i32_to_i24(start_tick),
                     false,
                     ticks_to_fetch,
                     block_number,
@@ -179,7 +165,7 @@ where
             fetched_ticks.append(&mut batch_ticks);
             remaining_ticks -= ticks_to_fetch;
             if let Some(last_tick) = fetched_ticks.last() {
-                start_tick = last_tick.tick;
+                start_tick = last_tick.tick.as_i32();
             } else {
                 break;
             }
@@ -190,14 +176,14 @@ where
             .filter(|tick| tick.initialized)
             .for_each(|tick| {
                 self.ticks.insert(
-                    tick.tick,
+                    tick.tick.as_i32(),
                     TickInfo {
                         initialized:     tick.initialized,
-                        liquidity_gross: tick.liquidity_gross,
-                        liquidity_net:   tick.liquidity_net
+                        liquidity_gross: tick.liquidityGross,
+                        liquidity_net:   tick.liquidityNet
                     }
                 );
-                self.flip_tick(tick.tick, self.tick_spacing);
+                self.flip_tick(tick.tick.as_i32(), self.tick_spacing);
             });
 
         Ok(())

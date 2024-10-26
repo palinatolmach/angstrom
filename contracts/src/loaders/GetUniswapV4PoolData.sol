@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "../../lib/forge-std/src/interfaces/IERC20.sol";
 import {IPoolManager} from "../../lib/v4-core/src/interfaces/IPoolManager.sol";
-import {PoolKey} from "../../lib/v4-core/src/types/PoolKey.sol";
-import {Currency} from "../../lib/v4-core/src/types/Currency.sol";
+import {PoolId} from "../../lib/v4-core/src/types/PoolId.sol";
 import {Slot0} from "../../lib/v4-core/src/types/Slot0.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 
@@ -18,16 +17,16 @@ contract GetUniswapV4PoolData {
         int128 liquidityNet;
     }
 
-    constructor(address poolManager, PoolKey memory poolKey) {
+    constructor(PoolId poolId, address poolManager, address asset0, address asset1) {
         if (codeSizeIsZero(poolManager)) revert("Invalid pool address");
         PoolData memory poolData;
-        Slot0 slot0 = IUniV4.getSlot0(IPoolManager(poolManager), poolKey.toId());
-        uint128 liquidity = IUniV4.getPoolLiquidity(IPoolManager(poolManager), poolKey.toId());
+        Slot0 slot0 = IUniV4.getSlot0(IPoolManager(poolManager), poolId);
+        uint128 liquidity = IUniV4.getPoolLiquidity(IPoolManager(poolManager), poolId);
         (, int128 liquidityNet) =
-            IUniV4.getTickLiquidity(IPoolManager(poolManager), poolKey.toId(), slot0.tick());
+            IUniV4.getTickLiquidity(IPoolManager(poolManager), poolId, slot0.tick());
 
-        poolData.token0Decimals = IERC20(Currency.unwrap(poolKey.currency0)).decimals();
-        poolData.token1Decimals = IERC20(Currency.unwrap(poolKey.currency1)).decimals();
+        poolData.token0Decimals = IERC20(asset0).decimals();
+        poolData.token1Decimals = IERC20(asset1).decimals();
         poolData.liquidity = liquidity;
         poolData.sqrtPrice = slot0.sqrtPriceX96();
         poolData.tick = slot0.tick();
