@@ -8,3 +8,5 @@
 .env
 .luasnip
 .venv
+/proofs
+/kompiled
