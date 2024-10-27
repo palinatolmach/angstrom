@@ -124,7 +124,7 @@ library IUniV4 {
                 revert(0x1c, 0x04)
             }
             let packed := mload(0x00)
-            liquidityGross := shr(128, shl(128, packed))
+            liquidityGross := and(packed, 0xffffffffffffffffffffffffffffffff)
             liquidityNet := sar(128, packed)
         }
     }
