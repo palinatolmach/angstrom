@@ -31,7 +31,7 @@ library ToBOrderBufferLib {
            "address asset_in,"
            "address asset_out,"
            "address recipient,"
-           "uint256 valid_for_block"
+           "uint64 valid_for_block"
         ")"
     );
 
