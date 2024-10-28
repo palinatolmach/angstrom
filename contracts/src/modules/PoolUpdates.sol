@@ -25,6 +25,7 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {X128MathLib} from "../libraries/X128MathLib.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
 /// @author philogy <https://github.com/philogy>
@@ -39,10 +40,10 @@ abstract contract PoolUpdates is
     IBeforeRemoveLiquidityHook
 {
     using SafeTransferLib for address;
+    using X128MathLib for uint256;
     using SafeCastLib for uint256;
 
     using IUniV4 for IPoolManager;
-    using FixedPointMathLib for uint256;
     using SignedUnsignedLib for *;
 
     Positions internal positions;
@@ -57,42 +58,67 @@ abstract contract PoolUpdates is
     ) external override returns (bytes4) {
         _onlyUniV4();
 
-        uint256 liquidityDelta = uint256(params.liquidityDelta);
-
         PoolId id = _toId(key);
-        int24 lowerTick = params.tickLower;
-        int24 upperTick = params.tickUpper;
         PoolRewards storage rewards = poolRewards[id];
-        (Position storage position,) = positions.get(id, sender, lowerTick, upperTick, params.salt);
 
-        int24 currentTick = UNI_V4.getSlot0(id).tick();
+        uint256 growthInside;
+        {
+            int24 currentTick = UNI_V4.getSlot0(id).tick();
+            uint256 lowerGrowth = rewards.rewardGrowthOutside[uint24(params.tickLower)];
+            uint256 upperGrowth = rewards.rewardGrowthOutside[uint24(params.tickUpper)];
 
-        uint256 lowerGrowth = rewards.rewardGrowthOutside[uint24(lowerTick)];
-        uint256 upperGrowth = rewards.rewardGrowthOutside[uint24(upperTick)];
-
-        uint256 newGrowthInside;
-        if (currentTick < lowerTick) {
-            // Check to maintain invariant that `currentTick < lowerTick -> upperGrowth <= lowerGrowth`
-            if (lowerGrowth < upperGrowth) {
-                // Should only be the case for newly initialized ticks.
-                rewards.rewardGrowthOutside[uint24(lowerTick)] = lowerGrowth = upperGrowth;
+            if (currentTick < params.tickLower) {
+                unchecked {
+                    growthInside = lowerGrowth - upperGrowth;
+                }
+            } else if (params.tickUpper <= currentTick) {
+                // Following Uniswap's convention, if tick is below and uninitialized initialize growth
+                // outside to global accumulator.
+                if (!UNI_V4.isInitialized(id, params.tickLower, key.tickSpacing)) {
+                    rewards.rewardGrowthOutside[uint24(params.tickLower)] =
+                        lowerGrowth = rewards.globalGrowth;
+                }
+                if (!UNI_V4.isInitialized(id, params.tickUpper, key.tickSpacing)) {
+                    rewards.rewardGrowthOutside[uint24(params.tickUpper)] =
+                        upperGrowth = rewards.globalGrowth;
+                }
+                unchecked {
+                    growthInside = upperGrowth - lowerGrowth;
+                }
             } else {
-                newGrowthInside = lowerGrowth - upperGrowth;
+                if (!UNI_V4.isInitialized(id, params.tickLower, key.tickSpacing)) {
+                    rewards.rewardGrowthOutside[uint24(params.tickLower)] =
+                        lowerGrowth = rewards.globalGrowth;
+                }
+                unchecked {
+                    growthInside = rewards.globalGrowth - lowerGrowth - upperGrowth;
+                }
             }
-        } else if (upperTick <= currentTick) {
-            // Check to maintain invariant that `upperTick <= currentTick -> lowerGrowth <= upperGrowth`
-            if (upperGrowth < lowerGrowth) {
-                // Should only be the case for newly initialized ticks.
-                rewards.rewardGrowthOutside[uint24(upperTick)] = upperGrowth = lowerGrowth;
-            } else {
-                newGrowthInside = upperGrowth - lowerGrowth;
-            }
-        } else {
-            newGrowthInside = rewards.globalGrowth - lowerGrowth - upperGrowth;
         }
 
-        uint256 newPastRewards = newGrowthInside.mulWad(liquidityDelta);
-        position.pastRewards += newPastRewards;
+        (Position storage position, bytes32 positionKey) =
+            positions.get(id, sender, params.tickLower, params.tickUpper, params.salt);
+
+        uint128 lastLiquidity = UNI_V4.getPositionLiquidity(id, positionKey);
+        uint128 liquidityDelta = uint128(uint256(params.liquidityDelta));
+        uint128 newLiquidity = lastLiquidity + liquidityDelta;
+
+        if (lastLiquidity == 0) {
+            position.lastGrowthInside = growthInside;
+        } else {
+            // We want to update `lastGrowthInside` such that any previously accrued rewards are
+            // preserved:
+            // rewards' == rewards
+            // (growth_inside - last') * L' = (growth_inside - last) * L
+            //  growth_inside - last' = (growth_inside - last) * L / L'
+            // last' = growth_inside - (growth_inside - last) * L / L'
+            unchecked {
+                uint256 lastGrowthAdjustment = FixedPointMathLib.fullMulDiv(
+                    growthInside - position.lastGrowthInside, lastLiquidity, newLiquidity
+                );
+                position.lastGrowthInside = growthInside - lastGrowthAdjustment;
+            }
+        }
 
         return this.beforeAddLiquidity.selector;
     }
@@ -105,27 +131,28 @@ abstract contract PoolUpdates is
     ) external override returns (bytes4) {
         _onlyUniV4();
 
-        uint256 liquidityDelta = params.liquidityDelta.neg();
+        unchecked {
+            PoolId id = _toId(key);
+            (Position storage position, bytes32 positionKey) =
+                positions.get(id, sender, params.tickLower, params.tickUpper, params.salt);
+            int24 currentTick = UNI_V4.getSlot0(id).tick();
+            uint256 growthInside =
+                poolRewards[id].getGrowthInside(currentTick, params.tickLower, params.tickUpper);
 
-        PoolId id = _toId(key);
-        (Position storage position, bytes32 positionKey) =
-            positions.get(id, sender, params.tickLower, params.tickUpper, params.salt);
-        int24 currentTick = UNI_V4.getSlot0(id).tick();
-        uint256 growthInside =
-            poolRewards[id].getGrowthInside(currentTick, params.tickLower, params.tickUpper);
+            uint128 positionTotalLiquidity = UNI_V4.getPositionLiquidity(id, positionKey);
+            uint256 rewards = X128MathLib.fullMulX128(
+                growthInside - position.lastGrowthInside, positionTotalLiquidity
+            );
 
-        uint128 positionTotalLiquidity = UNI_V4.getPositionLiquidity(id, positionKey);
-        uint256 rewards = growthInside.mulWad(positionTotalLiquidity) - position.pastRewards;
+            if (rewards > 0) {
+                // Pay rewards to owner via uniswap delta => assumes that router is not malicious.
+                UNI_V4.sync(key.currency0);
+                Currency.unwrap(key.currency0).safeTransfer(address(UNI_V4), rewards);
+                UNI_V4.settleFor(sender);
 
-        // Pay rewards to owner via uniswap delta => assumes that router is not malicious.
-        if (rewards > 0) {
-            UNI_V4.sync(key.currency0);
-            Currency.unwrap(key.currency0).safeTransfer(address(UNI_V4), rewards);
-            UNI_V4.settleFor(sender);
+                position.lastGrowthInside = growthInside;
+            }
         }
-
-        position.pastRewards =
-            growthInside.mulWad(positionTotalLiquidity - liquidityDelta.toUint128());
 
         return this.beforeRemoveLiquidity.selector;
     }

@@ -28,6 +28,8 @@ import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 contract BaseTest is Test, HookDeployer {
     using FormatLib for *;
 
+    bool constant DEBUG = false;
+
     uint256 internal constant REAL_TIMESTAMP = 1721652639;
 
     bytes32 internal constant ANG_BALANCES_SLOT = bytes32(uint256(0x2));
@@ -301,6 +303,18 @@ contract BaseTest is Test, HookDeployer {
     }
 
     function max(uint256 x, uint256 y) internal pure returns (uint256) {
+        return x > y ? x : y;
+    }
+
+    function min(int256 x, int256 y) internal pure returns (int256) {
+        return x < y ? x : y;
+    }
+
+    function min(int24 x, int24 y) internal pure returns (int24) {
+        return x < y ? x : y;
+    }
+
+    function max(int24 x, int24 y) internal pure returns (int24) {
         return x > y ? x : y;
     }
 

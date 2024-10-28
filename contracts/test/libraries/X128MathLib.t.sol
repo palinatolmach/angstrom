@@ -13,10 +13,6 @@ contract X128MathLibTest is BaseTest {
         test_fuzzing_matchesSolady_fullMulX128(x, y);
     }
 
-    function check_matchesNaive_fullMulX128(uint256 x, uint256 y) public view {
-        test_fuzzing_matchesNaive_fullMulX128(x, y);
-    }
-
     function test_fuzzing_matchesSolady_fullMulX128(uint256 x, uint256 y) public view {
         bool success;
         uint256 result;

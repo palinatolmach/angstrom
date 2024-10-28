@@ -8,7 +8,7 @@ struct Positions {
 }
 
 struct Position {
-    uint256 pastRewards;
+    uint256 lastGrowthInside;
 }
 
 using PositionsLib for Positions global;

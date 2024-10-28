@@ -14,11 +14,13 @@ import {UserOrderBuffer} from "src/types/UserOrderBuffer.sol";
 import {UserOrderVariantMap} from "src/types/UserOrderVariantMap.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {Position} from "src/types/Positions.sol";
-import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {PoolConfigStore} from "src/libraries/PoolConfigStore.sol";
+import {X128MathLib} from "src/libraries/X128MathLib.sol";
+
+import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract OpenAngstrom is Angstrom {
-    using FixedPointMathLib for uint256;
     using IUniV4 for IPoolManager;
 
     constructor(IPoolManager uniV4, address controller, address feeMaster)
@@ -100,10 +102,8 @@ contract OpenAngstrom is Angstrom {
         return bundleDeltas.deltas[asset].get();
     }
 
-    function resetDeltas(address[] memory assets) public {
-        for (uint256 i = 0; i < assets.length; i++) {
-            bundleDeltas.deltas[assets[i]].set(0);
-        }
+    function configStore() public view returns (PoolConfigStore) {
+        return _configStore;
     }
 
     function balanceOf(address asset, address owner) public view returns (uint256) {
@@ -130,8 +130,12 @@ contract OpenAngstrom is Angstrom {
         (Position storage position, bytes32 positionKey) =
             positions.get(args.id, args.owner, args.lowerTick, args.upperTick, args.salt);
         uint128 liquidity = UNI_V4.getPositionLiquidity(args.id, positionKey);
-        return poolRewards[args.id].getGrowthInside(
-            UNI_V4.getSlot0(args.id).tick(), args.lowerTick, args.upperTick
-        ).mulWad(liquidity) - position.pastRewards;
+        unchecked {
+            uint256 growthInside = poolRewards[args.id].getGrowthInside(
+                UNI_V4.getSlot0(args.id).tick(), args.lowerTick, args.upperTick
+            );
+            uint256 netGrowthInside = growthInside - position.lastGrowthInside;
+            return X128MathLib.fullMulX128(netGrowthInside, liquidity);
+        }
     }
 }

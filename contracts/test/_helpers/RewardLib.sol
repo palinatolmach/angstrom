@@ -23,7 +23,7 @@ using RewardLib for TickReward global;
 library RewardLib {
     using FormatLib for *;
 
-    uint256 internal constant MAX_LOOP = 20;
+    uint256 internal constant MAX_LOOP = 120;
 
     using RewardLib for TickReward[];
     using IUniV4 for IPoolManager;

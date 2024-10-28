@@ -9,13 +9,12 @@ import {UniConsumer} from "./UniConsumer.sol";
 
 import {TickLib} from "../libraries/TickLib.sol";
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
-import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {X128MathLib} from "../libraries/X128MathLib.sol";
 
 /// @author philogy <https://github.com/philogy>
 /// @dev Core logic responsible for updating reward accumulators to distribute rewards.
 abstract contract GrowthOutsideUpdater is UniConsumer {
     using IUniV4 for IPoolManager;
-    using FixedPointMathLib for uint256;
     using TickLib for uint256;
 
     error WrongEndLiquidity(uint128 endLiquidity, uint128 actualCurrentLiquidity);
@@ -38,7 +37,8 @@ abstract contract GrowthOutsideUpdater is UniConsumer {
         if (currentOnly) {
             uint128 amount;
             (reader, amount) = reader.readU128();
-            poolRewards_.globalGrowth += flatDivWad(amount, UNI_V4.getPoolLiquidity(id));
+            poolRewards_.globalGrowth +=
+                X128MathLib.flatDivX128(amount, UNI_V4.getPoolLiquidity(id));
 
             return (reader, amount);
         }
@@ -63,7 +63,7 @@ abstract contract GrowthOutsideUpdater is UniConsumer {
 
         uint128 donateToCurrent;
         (newReader, donateToCurrent) = newReader.readU128();
-        cumulativeGrowth += flatDivWad(donateToCurrent, endLiquidity);
+        cumulativeGrowth += X128MathLib.flatDivX128(donateToCurrent, endLiquidity);
         total += donateToCurrent;
 
         newReader.requireAtEndOf(amountsEnd);
@@ -91,12 +91,14 @@ abstract contract GrowthOutsideUpdater is UniConsumer {
 
         do {
             if (initialized) {
-                uint256 amount;
+                uint128 amount;
                 (reader, amount) = reader.readU128();
 
                 total += amount;
-                cumulativeGrowth += flatDivWad(amount, liquidity);
-                rewardGrowthOutside[uint24(rewardTick)] += cumulativeGrowth;
+                cumulativeGrowth += X128MathLib.flatDivX128(amount, liquidity);
+                unchecked {
+                    rewardGrowthOutside[uint24(rewardTick)] += cumulativeGrowth;
+                }
 
                 (, int128 netLiquidity) = UNI_V4.getTickLiquidity(pool.id, rewardTick);
                 liquidity = MixedSignLib.add(liquidity, netLiquidity);
@@ -120,12 +122,14 @@ abstract contract GrowthOutsideUpdater is UniConsumer {
 
         do {
             if (initialized) {
-                uint256 amount;
+                uint128 amount;
                 (reader, amount) = reader.readU128();
 
                 total += amount;
-                cumulativeGrowth += flatDivWad(amount, liquidity);
-                rewardGrowthOutside[uint24(rewardTick)] += cumulativeGrowth;
+                cumulativeGrowth += X128MathLib.flatDivX128(amount, liquidity);
+                unchecked {
+                    rewardGrowthOutside[uint24(rewardTick)] += cumulativeGrowth;
+                }
 
                 (, int128 netLiquidity) = UNI_V4.getTickLiquidity(pool.id, rewardTick);
                 liquidity = MixedSignLib.sub(liquidity, netLiquidity);
@@ -134,12 +138,5 @@ abstract contract GrowthOutsideUpdater is UniConsumer {
         } while (rewardTick > pool.currentTick);
 
         return (reader, total, cumulativeGrowth, liquidity);
-    }
-
-    /**
-     * @dev Overflow-safe fixed-point division of `x / y` resulting in `0` if `y` is zero.
-     */
-    function flatDivWad(uint256 x, uint256 y) internal pure returns (uint256) {
-        return (x * FixedPointMathLib.WAD).rawDiv(y);
     }
 }

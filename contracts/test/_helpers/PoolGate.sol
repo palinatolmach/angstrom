@@ -70,15 +70,11 @@ contract PoolGate is IUnlockCallback, CommonBase, BaseTest {
             liquidityDelta: liquidity.signed(),
             salt: salt
         });
-        try UNI_V4.unlock(abi.encodeCall(this.__addLiquidity, (asset0, asset1, msg.sender, params)))
-        returns (bytes memory data) {
-            BalanceDelta delta = abi.decode(data, (BalanceDelta));
-            amount0 = uint128(-delta.amount0());
-            amount1 = uint128(-delta.amount1());
-        } catch (bytes memory err) {
-            console.log("stuff failed???");
-            console.logBytes(err);
-        }
+        bytes memory data =
+            UNI_V4.unlock(abi.encodeCall(this.__addLiquidity, (asset0, asset1, msg.sender, params)));
+        BalanceDelta delta = abi.decode(data, (BalanceDelta));
+        amount0 = uint128(-delta.amount0());
+        amount1 = uint128(-delta.amount1());
     }
 
     function removeLiquidity(
