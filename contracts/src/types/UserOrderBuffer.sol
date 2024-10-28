@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {CalldataReader} from "./CalldataReader.sol";
 import {UserOrderVariantMap} from "./UserOrderVariantMap.sol";
-import {TypedDataHasher} from "./TypedDataHasher.sol";
 import {PriceAB as PriceOutVsIn, AmountA as AmountOut, AmountB as AmountIn} from "./Price.sol";
 
 struct UserOrderBuffer {
