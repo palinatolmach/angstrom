@@ -173,7 +173,6 @@ library UserOrderBufferLib {
             if (quantity < minQuantityIn) revert FillingTooLittle();
             if (quantity > maxQuantityIn) revert FillingTooMuch();
         } else {
-            // Partial order.
             (reader, quantity) = reader.readU128();
             self.exactIn_or_minQuantityIn = variant.exactIn() ? 1 : 0;
             self.quantity_or_maxQuantityIn = quantity;

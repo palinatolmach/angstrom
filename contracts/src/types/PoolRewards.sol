@@ -6,7 +6,7 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 
-/// @dev Should accomodate all possible tick values.
+/// @dev Should accommodate all possible tick values.
 uint256 constant REWARD_GROWTH_SIZE = 16777216;
 
 struct PoolRewards {

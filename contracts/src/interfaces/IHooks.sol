@@ -69,7 +69,7 @@ interface IBeforeRemoveLiquidityHook {
     /// @param sender The initial msg.sender for the remove liquidity call
     /// @param key The key for the pool
     /// @param params The parameters for removing liquidity
-    /// @param hookData Arbitrary data handed into the PoolManager by the liquidty provider to be be passed on to the hook
+    /// @param hookData Arbitrary data handed into the PoolManager by the liquidity provider to be be passed on to the hook
     /// @return bytes4 The function selector for the hook
     function beforeRemoveLiquidity(
         address sender,
@@ -85,7 +85,7 @@ interface IAfterRemoveLiquidityHook {
     /// @param key The key for the pool
     /// @param params The parameters for removing liquidity
     /// @param delta The caller's balance delta after removing liquidity
-    /// @param hookData Arbitrary data handed into the PoolManager by the liquidty provider to be be passed on to the hook
+    /// @param hookData Arbitrary data handed into the PoolManager by the liquidity provider to be be passed on to the hook
     /// @return bytes4 The function selector for the hook
     /// @return BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
     function afterRemoveLiquidity(

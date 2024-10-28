@@ -29,7 +29,7 @@ import {X128MathLib} from "../libraries/X128MathLib.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
 /// @author philogy <https://github.com/philogy>
-/// @dev Top-level entry point for updating any state related to the underyling hooked Uniswap V4
+/// @dev Top-level entry point for updating any state related to the underlying hooked Uniswap V4
 /// pools. Updates individual positions rewards, initiates swaps and reward distribution.
 abstract contract PoolUpdates is
     UniConsumer,

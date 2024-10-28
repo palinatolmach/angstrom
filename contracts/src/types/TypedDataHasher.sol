@@ -16,7 +16,7 @@ library TypedDataHasherLib {
             // always overwrite it in `hashTypedData`).
             hasher := mload(0x40)
             mstore(0x40, add(hasher, 0x42))
-            // Pre-store ERC721 header bytes and domain separator in memory.
+            // Pre-store ERC712 header bytes and domain separator in memory.
             mstore(hasher, hex"1901")
             mstore(add(hasher, 2), separator)
         }
