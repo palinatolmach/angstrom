@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {tint256} from "transient-goodies/TransientPrimitives.sol";
-import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 
 struct DeltaTracker {
     mapping(address asset => tint256 netBalances) deltas;

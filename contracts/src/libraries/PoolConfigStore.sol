@@ -154,9 +154,9 @@ library PoolConfigStoreLib {
                     break
                 }
             }
-            // Increase `totalEntryBytes` by 0x20 if we broke in the loop.
+            // Increase `totalEntryBytes` by 0x20 if we didn't break in the loop.
             totalEntryBytes := add(totalEntryBytes, shl(5, eq(entryOffset, entriesEnd)))
-            // Append the entry to the end incase we include it (`totalEntryBytes` will ensure we don't
+            // Append the entry to the end in case we include it (`totalEntryBytes` will ensure we don't
             // if the entry was found & replaced).
             mstore(entriesEnd, newEntry)
             // Deploy store.

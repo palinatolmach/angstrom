@@ -159,12 +159,8 @@ contract Angstrom is
         assembly ("memory-safe") {
             to := or(mul(iszero(to), from), to)
         }
-        _settleOrderIn(
-            from, buffer.assetIn, AmountIn.wrap(buffer.quantityIn), variantMap.useInternal()
-        );
-        _settleOrderOut(
-            to, buffer.assetOut, AmountOut.wrap(buffer.quantityOut), variantMap.useInternal()
-        );
+        _settleOrderIn(from, buffer.assetIn, AmountIn.wrap(buffer.quantityIn), buffer.useInternal);
+        _settleOrderOut(to, buffer.assetOut, AmountOut.wrap(buffer.quantityOut), buffer.useInternal);
 
         return reader;
     }
@@ -245,11 +241,11 @@ contract Angstrom is
         assembly ("memory-safe") {
             to := or(mul(iszero(to), from), to)
         }
-        _settleOrderOut(to, buffer.assetOut, amountOut, variantMap.useInternal());
+        _settleOrderOut(to, buffer.assetOut, amountOut, buffer.useInternal);
 
         hook.tryTrigger(from);
 
-        _settleOrderIn(from, buffer.assetIn, amountIn, variantMap.useInternal());
+        _settleOrderIn(from, buffer.assetIn, amountIn, buffer.useInternal);
 
         return reader;
     }

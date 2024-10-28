@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {CalldataReader} from "./CalldataReader.sol";
 import {UserOrderVariantMap} from "./UserOrderVariantMap.sol";
-import {TypedDataHasher} from "./TypedDataHasher.sol";
 import {PriceAB as PriceOutVsIn, AmountA as AmountOut, AmountB as AmountIn} from "./Price.sol";
 
 struct UserOrderBuffer {
@@ -173,7 +172,6 @@ library UserOrderBufferLib {
             if (quantity < minQuantityIn) revert FillingTooLittle();
             if (quantity > maxQuantityIn) revert FillingTooMuch();
         } else {
-            // Partial order.
             (reader, quantity) = reader.readU128();
             self.exactIn_or_minQuantityIn = variant.exactIn() ? 1 : 0;
             self.quantity_or_maxQuantityIn = quantity;

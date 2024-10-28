@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {AmountA as AmountOut, AmountB as AmountIn} from "./Price.sol";
-
 struct ToBOrderBuffer {
     bytes32 typeHash;
     uint256 quantityIn;
@@ -31,7 +29,7 @@ library ToBOrderBufferLib {
            "address asset_in,"
            "address asset_out,"
            "address recipient,"
-           "uint256 valid_for_block"
+           "uint64 valid_for_block"
         ")"
     );
 

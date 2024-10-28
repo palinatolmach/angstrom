@@ -7,7 +7,6 @@ import {Settlement} from "./Settlement.sol";
 import {TopLevelAuth} from "./TopLevelAuth.sol";
 import {IBeforeAddLiquidityHook, IBeforeRemoveLiquidityHook} from "../interfaces/IHooks.sol";
 
-import {DeltaTracker} from "../types/DeltaTracker.sol";
 import {PairArray} from "../types/Pair.sol";
 import {CalldataReader} from "../types/CalldataReader.sol";
 import {PoolRewards} from "../types/PoolRewards.sol";
@@ -18,18 +17,16 @@ import {PoolUpdateVariantMap} from "../types/PoolUpdateVariantMap.sol";
 import {SignedUnsignedLib} from "super-sol/libraries/SignedUnsignedLib.sol";
 import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
-import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "../interfaces/IUniV4.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {X128MathLib} from "../libraries/X128MathLib.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
 /// @author philogy <https://github.com/philogy>
-/// @dev Top-level entry point for updating any state related to the underyling hooked Uniswap V4
+/// @dev Top-level entry point for updating any state related to the underlying hooked Uniswap V4
 /// pools. Updates individual positions rewards, initiates swaps and reward distribution.
 abstract contract PoolUpdates is
     UniConsumer,

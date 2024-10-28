@@ -14,8 +14,6 @@ abstract contract TopLevelAuth is UniConsumer {
     error NotController();
     error OnlyOncePerBlock();
     error NotNode();
-    error InvalidPoolKey();
-    error NotFromHook();
     error IndexMayHaveChanged();
 
     address internal immutable _CONTROLLER;
