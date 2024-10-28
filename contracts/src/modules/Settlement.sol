@@ -13,7 +13,7 @@ import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 abstract contract Settlement is UniConsumer {
     using SafeTransferLib for address;
 
-    error BundleChangeNetNegative(address asset);
+    error BundlDeltaUnresolved(address asset);
     error NotFeeMaster();
 
     /// @dev Address that can pull arbitrary funds from the contract, assumed to be trustless,
@@ -92,8 +92,8 @@ abstract contract Settlement is UniConsumer {
             uint256 saving = asset.save();
             uint256 settle = asset.settle();
 
-            if (bundleDeltas.sub(addr, saving + settle) < 0) {
-                revert BundleChangeNetNegative(addr);
+            if (bundleDeltas.sub(addr, saving + settle) != 0) {
+                revert BundlDeltaUnresolved(addr);
             }
 
             if (settle > 0) {
