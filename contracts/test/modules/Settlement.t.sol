@@ -8,6 +8,7 @@ import {Bundle, TopOfBlockOrder, Asset} from "test/_reference/Bundle.sol";
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {Angstrom} from "src/Angstrom.sol";
 import {Settlement} from "src/modules/Settlement.sol";
+import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {LibSort} from "solady/src/utils/LibSort.sol";
 import {
     NoReturnToken,
@@ -67,7 +68,7 @@ contract SettlementTest is BaseTest {
         vm.assume(asset.code.length == 0);
 
         vm.prank(user);
-        vm.expectRevert(Settlement.TransferFromFailed.selector);
+        vm.expectRevert(SafeTransferLib.TransferFromFailed.selector);
         angstrom.deposit(asset, amount);
     }
 
@@ -86,7 +87,7 @@ contract SettlementTest is BaseTest {
         token.approve(address(angstrom), type(uint256).max);
 
         vm.prank(user);
-        vm.expectRevert(Settlement.TransferFromFailed.selector);
+        vm.expectRevert(SafeTransferLib.TransferFromFailed.selector);
         angstrom.deposit(address(token), amount + 1);
     }
 
@@ -105,7 +106,7 @@ contract SettlementTest is BaseTest {
         token.approve(address(angstrom), type(uint256).max);
 
         vm.prank(user);
-        vm.expectRevert(Settlement.TransferFromFailed.selector);
+        vm.expectRevert(SafeTransferLib.TransferFromFailed.selector);
         angstrom.deposit(address(token), amount + 1);
     }
 
@@ -124,7 +125,7 @@ contract SettlementTest is BaseTest {
         token.approve(address(angstrom), type(uint256).max);
 
         vm.prank(user);
-        vm.expectRevert(Settlement.TransferFromFailed.selector);
+        vm.expectRevert(SafeTransferLib.TransferFromFailed.selector);
         angstrom.deposit(address(token), amount + 1);
     }
 
@@ -143,7 +144,7 @@ contract SettlementTest is BaseTest {
         token.approve(address(angstrom), type(uint256).max);
 
         vm.prank(user);
-        vm.expectRevert(Settlement.TransferFromFailed.selector);
+        vm.expectRevert(SafeTransferLib.TransferFromFailed.selector);
         angstrom.deposit(address(token), amount + 1);
     }
 
