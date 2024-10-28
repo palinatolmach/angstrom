@@ -15,7 +15,6 @@ abstract contract Settlement is UniConsumer {
 
     error BundleChangeNetNegative(address asset);
     error NotFeeMaster();
-    error TransferFromFailed();
 
     /// @dev Address that can pull arbitrary funds from the contract, assumed to be trustless,
     /// log proof checking contract.
