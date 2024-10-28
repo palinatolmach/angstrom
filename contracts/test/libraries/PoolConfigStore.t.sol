@@ -35,6 +35,14 @@ contract PoolConfigStoreTest is BaseTest {
         }
     }
 
+    function test_entry_size() public pure {
+        assertEq(
+            ENTRY_SIZE,
+            32,
+            "Ensure that new size doesn't require changes like an index bounds check"
+        );
+    }
+
     function test_default_store() public view {
         PoolConfigStore store = angstrom.configStore();
         assertEq(store.totalEntries(), 0);
