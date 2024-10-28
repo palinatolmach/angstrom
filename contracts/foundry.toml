@@ -44,3 +44,9 @@ depth = 100
 
 [profile.heavy-fuzz.invariant]
 runs = 200
+
+[profile.kontrol]
+src = "test"
+test = "test"
+script = "test"
+out = "out"
