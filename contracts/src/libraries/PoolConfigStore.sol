@@ -25,6 +25,7 @@ uint256 constant HASH_TO_STORE_KEY_SHIFT = 40;
 
 /// @dev Max fee allowed.
 uint24 constant MAX_FEE = 0.2e6;
+uint256 constant ONE_E6 = 1e6;
 
 type StoreKey is bytes27;
 

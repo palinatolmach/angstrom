@@ -5,8 +5,13 @@ import {CalldataReader} from "./CalldataReader.sol";
 import {AssetArray} from "./Asset.sol";
 import {RayMathLib} from "../libraries/RayMathLib.sol";
 import {
-    PoolConfigStore, StoreKey, HASH_TO_STORE_KEY_SHIFT
+    PoolConfigStore,
+    StoreKey,
+    HASH_TO_STORE_KEY_SHIFT,
+    ONE_E6
 } from "../libraries/PoolConfigStore.sol";
+
+import {console} from "forge-std/console.sol";
 
 type Pair is uint256;
 
@@ -34,15 +39,13 @@ library PairLib {
     uint256 internal constant PAIR_ASSET1_OFFSET = 0x20;
     uint256 internal constant PAIR_TICK_SPACING_OFFSET = 0x40;
     uint256 internal constant PAIR_FEE_OFFSET = 0x60;
-    uint256 internal constant PAIR_PRICE_10_OFFSET = 0x80;
-    uint256 internal constant PAIR_PRICE_01_OFFSET = 0xa0;
+    uint256 internal constant PAIR_PRICE_0_OVER_1_OFFSET = 0x80;
+    uint256 internal constant PAIR_PRICE_1_OVER_0_OFFSET = 0xa0;
 
     uint256 internal constant INDEX_A_OFFSET = 16;
     uint256 internal constant INDEX_B_MASK = 0xffff;
 
     uint256 internal constant PAIR_CD_BYTES = 38;
-
-    uint256 internal constant ONE_E6 = 1e6;
 
     function readFromAndValidate(CalldataReader reader, AssetArray assets, PoolConfigStore store)
         internal
@@ -99,11 +102,11 @@ library PairLib {
 
                 uint16 storeIndex;
                 (reader, storeIndex) = reader.readU16();
-                (int24 tickSpacing, uint24 feeIne6) = store.get(key, storeIndex);
+                (int24 tickSpacing, uint24 feeInE6) = store.get(key, storeIndex);
 
                 assembly ("memory-safe") {
                     mstore(add(raw_memoryOffset, PAIR_TICK_SPACING_OFFSET), tickSpacing)
-                    mstore(add(raw_memoryOffset, PAIR_FEE_OFFSET), feeIne6)
+                    mstore(add(raw_memoryOffset, PAIR_FEE_OFFSET), feeInE6)
                 }
             }
 
@@ -113,8 +116,8 @@ library PairLib {
                 (reader, price1Over0) = reader.readU256();
                 uint256 price0Over1 = price1Over0.invRayUnchecked();
                 assembly ("memory-safe") {
-                    mstore(add(raw_memoryOffset, PAIR_PRICE_10_OFFSET), price1Over0)
-                    mstore(add(raw_memoryOffset, PAIR_PRICE_01_OFFSET), price0Over1)
+                    mstore(add(raw_memoryOffset, PAIR_PRICE_0_OVER_1_OFFSET), price0Over1)
+                    mstore(add(raw_memoryOffset, PAIR_PRICE_1_OVER_0_OFFSET), price1Over0)
                 }
             }
 
@@ -172,7 +175,7 @@ library PairLib {
             let offsetIfZeroToOne := shl(5, zeroToOne)
             assetIn := mload(add(self, xor(offsetIfZeroToOne, 0x20)))
             assetOut := mload(add(self, offsetIfZeroToOne))
-            priceOutVsIn := mload(add(self, add(PAIR_PRICE_10_OFFSET, offsetIfZeroToOne)))
+            priceOutVsIn := mload(add(self, add(PAIR_PRICE_0_OVER_1_OFFSET, offsetIfZeroToOne)))
             oneMinusFee := sub(ONE_E6, mload(add(self, PAIR_FEE_OFFSET)))
         }
         priceOutVsIn = priceOutVsIn * oneMinusFee / ONE_E6;

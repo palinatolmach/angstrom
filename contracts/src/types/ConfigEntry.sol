@@ -26,6 +26,8 @@ library ConfigEntryLib {
     }
 
     function feeInE6(ConfigEntry self) internal pure returns (uint24 fee) {
-        return uint24(ConfigEntry.unwrap(self) >> FEE_OFFSET);
+        assembly ("memory-safe") {
+            fee := and(FEE_MASK, shr(FEE_OFFSET, self))
+        }
     }
 }
